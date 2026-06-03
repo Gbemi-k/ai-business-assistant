@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Business Assistant Admin</title>
+  <style>
+    :root {
+      --ink: #18201b;
+      --muted: #67706a;
+      --line: #d8ded7;
+      --panel: #f8faf6;
+      --surface: #ffffff;
+      --brand: #1f6b4e;
+      --brand-dark: #164b38;
+      --accent: #d7a642;
+      --danger: #b83232;
+      --soft: #eaf2ea;
+      --shadow: 0 18px 50px rgba(24, 32, 27, 0.12);
+      font-family: "Aptos", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(31, 107, 78, 0.13), rgba(215, 166, 66, 0.1)),
+        repeating-linear-gradient(90deg, rgba(24, 32, 27, 0.025) 0 1px, transparent 1px 80px),
+        #f3f6ef;
+      min-height: 100vh;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      border-radius: 7px;
+      background: var(--brand);
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 10px 13px;
+      transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+    }
+
+    button:hover {
+      background: var(--brand-dark);
+      box-shadow: 0 8px 20px rgba(31, 107, 78, 0.2);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: var(--soft);
+      color: var(--brand-dark);
+    }
+
+    button.secondary:hover {
+      background: #dceadc;
+    }
+
+    button.danger {
+      background: #f4dddd;
+      color: var(--danger);
+    }
+
+    button.danger:hover {
+      background: #ebc8c8;
+      box-shadow: none;
+    }
+
+    .button-link {
+      border-radius: 7px;
+      background: var(--soft);
+      color: var(--brand-dark);
+      display: inline-block;
+      font-weight: 700;
+      padding: 10px 13px;
+      text-decoration: none;
+      transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+    }
+
+    .button-link:hover {
+      background: #dceadc;
+      box-shadow: 0 8px 20px rgba(31, 107, 78, 0.14);
+      transform: translateY(-1px);
+    }
+
+    label {
+      color: var(--muted);
+      display: grid;
+      font-size: 0.8rem;
+      font-weight: 700;
+      gap: 6px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    input,
+    select,
+    textarea {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--ink);
+      outline: none;
+      padding: 10px 11px;
+      width: 100%;
+      background: white;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(31, 107, 78, 0.13);
+    }
+
+    textarea {
+      min-height: 86px;
+      resize: vertical;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 18px;
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .auth-shell {
+      align-items: center;
+      display: grid;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .auth-card {
+      max-width: 520px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .sidebar,
+    .workspace {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .masthead {
+      padding: 6px 2px 10px;
+    }
+
+    .masthead h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2rem, 4vw, 3.7rem);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .masthead p {
+      color: var(--muted);
+      font-size: 1rem;
+      margin: 12px 0 0;
+      max-width: 670px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(216, 222, 215, 0.9);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .panel h2 {
+      align-items: center;
+      display: flex;
+      font-size: 1rem;
+      justify-content: space-between;
+      margin: 0 0 14px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .toolbar {
+      align-items: end;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1.2fr 1.3fr 0.8fr 0.7fr auto;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .session-bar {
+      align-items: center;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .session-bar p {
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .status {
+      border-left: 4px solid var(--accent);
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.4;
+      min-height: 44px;
+      padding: 8px 0 8px 12px;
+      white-space: pre-wrap;
+    }
+
+    .status.good {
+      border-color: var(--brand);
+      color: var(--brand-dark);
+    }
+
+    .status.bad {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 720px;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 12px 10px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.76rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    td.actions-cell {
+      min-width: 180px;
+      white-space: nowrap;
+    }
+
+    .pill {
+      background: var(--soft);
+      border-radius: 999px;
+      color: var(--brand-dark);
+      display: inline-flex;
+      font-size: 0.8rem;
+      font-weight: 800;
+      padding: 5px 9px;
+    }
+
+    .orders-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .order {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .order-head {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-between;
+    }
+
+    .order strong {
+      font-size: 0.98rem;
+    }
+
+    .order pre {
+      background: #111a15;
+      border-radius: 8px;
+      color: #e7f0e9;
+      line-height: 1.45;
+      margin: 12px 0 0;
+      overflow: auto;
+      padding: 12px;
+      white-space: pre-wrap;
+    }
+
+    .customer-card {
+      background: #edf5ed;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--brand-dark);
+      display: grid;
+      gap: 4px;
+      margin-top: 12px;
+      padding: 10px 12px;
+    }
+
+    .customer-card small {
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 8px 0;
+    }
+
+    @media (max-width: 980px) {
+      .shell,
+      .toolbar,
+      .grid.two {
+        grid-template-columns: 1fr;
+      }
+
+      .shell {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="auth-shell hidden" id="authScreen">
+    <section class="panel auth-card">
+      <section class="masthead">
+        <h1>Business Login</h1>
+        <p>Log in to manage your products, orders, and customer ordering link. New businesses can register below.</p>
+      </section>
+
+      <form id="authForm" class="grid">
+        <label>Business ID
+          <input id="authBusinessId" required placeholder="biz1">
+        </label>
+        <label>Business name
+          <input id="authBusinessName" required placeholder="StyleHub">
+        </label>
+        <label>Owner email
+          <input id="authEmail" required type="email" placeholder="owner@example.com">
+        </label>
+        <label>Password
+          <input id="authPassword" required type="password" placeholder="At least 6 characters">
+        </label>
+        <div class="actions">
+          <button type="button" id="authLogin">Login</button>
+          <button type="submit" class="secondary">Register new business</button>
+        </div>
+      </form>
+      <p id="authStatus" class="status">Use your business email and password to continue.</p>
+    </section>
+  </main>
+
+  <main class="shell hidden" id="dashboard">
+    <aside class="sidebar">
+      <section class="masthead">
+        <h1>Admin Console</h1>
+        <p>Control the business profile, products, orders, and customer chat from one focused workspace.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Business Profile</h2>
+        <form id="businessForm" class="grid">
+          <label>Business ID
+            <input id="businessId" required readonly placeholder="biz1">
+          </label>
+          <label>Business name
+            <input id="businessName" required placeholder="StyleHub">
+          </label>
+          <label>Owner email
+            <input id="email" required type="email" placeholder="owner@example.com">
+          </label>
+          <label>Password
+            <input id="password" type="password" placeholder="At least 6 characters">
+          </label>
+          <div class="grid two">
+            <label>Currency
+              <select id="currency">
+                <option value="$">$ Dollar</option>
+                <option value="&#8358;">&#8358; Naira</option>
+                <option value="&pound;">&pound; Pound</option>
+                <option value="&euro;">&euro; Euro</option>
+              </select>
+            </label>
+            <label>Tone
+              <select id="tone">
+                <option value="friendly">Friendly</option>
+                <option value="casual">Casual</option>
+                <option value="formal">Formal</option>
+              </select>
+            </label>
+          </div>
+          <label>Contact info
+            <input id="contactInfo" placeholder="Phone, WhatsApp, email">
+          </label>
+          <label>Business description
+            <textarea id="businessDescription" placeholder="What does this business sell? How do customers usually ask for it?"></textarea>
+          </label>
+          <label>AI personality
+            <textarea id="aiPersonality" placeholder="Helpful, concise, warm..."></textarea>
+          </label>
+          <div class="actions">
+            <button type="submit">Save profile</button>
+            <button type="button" class="secondary" id="logout">Logout</button>
+          </div>
+        </form>
+        <p id="businessStatus" class="status">Logged-in business profile appears here.</p>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <section class="panel session-bar">
+        <p id="sessionInfo">No business loaded.</p>
+        <div class="actions">
+          <a class="button-link" id="publicChatLink" href="#" target="_blank" rel="noopener">Open customer link</a>
+          <button type="button" class="secondary" id="refreshDashboard">Refresh dashboard</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Products <span class="pill" id="productCount">0 active</span></h2>
+        <form id="productForm" class="toolbar">
+          <label>Product
+            <input id="productName" required placeholder="e.g. 75cl packs">
+          </label>
+          <label>Aliases
+            <input id="productAliases" placeholder="e.g. water, small water">
+          </label>
+          <label>Price
+            <input id="productPrice" required min="0" step="0.01" type="number" placeholder="20">
+          </label>
+          <label>Stock
+            <input id="productStock" required min="0" step="1" type="number" placeholder="10">
+          </label>
+          <button type="submit">Add</button>
+        </form>
+        <p class="empty">Tip: aliases are customer words for the same product, like "water", "small water", or "phone charger". Shared aliases will make the assistant ask a clarification.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Aliases</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="productsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Orders <button type="button" class="secondary" id="refreshOrders">Refresh</button></h2>
+        <label>Show orders
+          <select id="orderFilter">
+            <option value="active">Active orders</option>
+            <option value="delivered">Delivered orders</option>
+            <option value="all">All orders</option>
+          </select>
+        </label>
+        <div id="ordersList" class="orders-list"></div>
+      </section>
+
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      businessId: localStorage.getItem("adminBusinessId") || "",
+      token: localStorage.getItem("adminToken") || "",
+      business: null,
+      products: [],
+      orders: [],
+      orderFilter: localStorage.getItem("adminOrderFilter") || "active",
+    };
+
+    const els = {
+      authScreen: document.querySelector("#authScreen"),
+      dashboard: document.querySelector("#dashboard"),
+      authForm: document.querySelector("#authForm"),
+      authBusinessId: document.querySelector("#authBusinessId"),
+      authBusinessName: document.querySelector("#authBusinessName"),
+      authEmail: document.querySelector("#authEmail"),
+      authPassword: document.querySelector("#authPassword"),
+      authLogin: document.querySelector("#authLogin"),
+      authStatus: document.querySelector("#authStatus"),
+      businessForm: document.querySelector("#businessForm"),
+      businessId: document.querySelector("#businessId"),
+      businessName: document.querySelector("#businessName"),
+      email: document.querySelector("#email"),
+      password: document.querySelector("#password"),
+      currency: document.querySelector("#currency"),
+      tone: document.querySelector("#tone"),
+      contactInfo: document.querySelector("#contactInfo"),
+      businessDescription: document.querySelector("#businessDescription"),
+      aiPersonality: document.querySelector("#aiPersonality"),
+      logout: document.querySelector("#logout"),
+      businessStatus: document.querySelector("#businessStatus"),
+      sessionInfo: document.querySelector("#sessionInfo"),
+      publicChatLink: document.querySelector("#publicChatLink"),
+      refreshDashboard: document.querySelector("#refreshDashboard"),
+      productForm: document.querySelector("#productForm"),
+      productName: document.querySelector("#productName"),
+      productAliases: document.querySelector("#productAliases"),
+      productPrice: document.querySelector("#productPrice"),
+      productStock: document.querySelector("#productStock"),
+      productsTable: document.querySelector("#productsTable"),
+      productCount: document.querySelector("#productCount"),
+      ordersList: document.querySelector("#ordersList"),
+      refreshOrders: document.querySelector("#refreshOrders"),
+      orderFilter: document.querySelector("#orderFilter"),
+    };
+
+    els.businessId.value = state.businessId;
+    els.orderFilter.value = state.orderFilter;
+
+    function currency() {
+      return state.business?.currency || els.currency.value || "$";
+    }
+
+    function money(amount) {
+      const numericAmount = Number(amount) || 0;
+      const fractionDigits = Number.isInteger(numericAmount) ? 0 : 2;
+
+      return `${currency()}${numericAmount.toLocaleString("en-US", {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      })}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setStatus(element, message, type = "") {
+      element.textContent = message;
+      element.className = `status ${type}`;
+    }
+
+    function showAuth(message = "Use your business email and password to continue.", type = "") {
+      els.authScreen.classList.remove("hidden");
+      els.dashboard.classList.add("hidden");
+      setStatus(els.authStatus, message, type);
+    }
+
+    function showDashboard() {
+      els.authScreen.classList.add("hidden");
+      els.dashboard.classList.remove("hidden");
+    }
+
+    async function api(path, options = {}) {
+      const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+
+      if (state.token) {
+        headers.Authorization = `Bearer ${state.token}`;
+      }
+
+      const response = await fetch(path, {
+        ...options,
+        headers,
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error || body.reply || "Request failed");
+      }
+
+      return body;
+    }
+
+    function activeBusinessId() {
+      if (!state.businessId) {
+        throw new Error("Please log in first.");
+      }
+      return state.businessId;
+    }
+
+    function fillBusinessForm(business) {
+      state.business = business;
+      state.businessId = business.businessId;
+      localStorage.setItem("adminBusinessId", state.businessId);
+      els.businessId.value = business.businessId;
+      els.businessName.value = business.name || "";
+      els.email.value = business.email || "";
+      els.currency.value = business.currency || "$";
+      els.tone.value = business.tone || "friendly";
+      els.contactInfo.value = business.contact_info || "";
+      els.businessDescription.value = business.description || "";
+      els.aiPersonality.value = business.ai_personality || "";
+      els.sessionInfo.textContent = `${business.name} (${business.businessId})`;
+      els.publicChatLink.href = `/b/${encodeURIComponent(business.businessId)}`;
+    }
+
+    function renderProducts() {
+      els.productCount.textContent = `${state.products.length} active`;
+      els.productsTable.innerHTML = state.products.map(product => `
+        <tr>
+          <td><strong>${product.name}</strong></td>
+          <td>${(product.aliases || []).join(", ") || "-"}</td>
+          <td>${money(product.price)}</td>
+          <td>${product.stock_quantity}</td>
+          <td>${new Date(product.updatedAt || product.createdAt).toLocaleString()}</td>
+          <td class="actions-cell">
+            <button class="secondary" type="button" data-edit="${product._id}">Edit</button>
+            <button class="danger" type="button" data-delete="${product._id}">Delete</button>
+          </td>
+        </tr>
+      `).join("");
+
+      if (state.products.length === 0) {
+        els.productsTable.innerHTML = `<tr><td colspan="6" class="empty">No active products yet.</td></tr>`;
+      }
+    }
+
+    function renderOrders() {
+      const visibleOrders = state.orders.filter(order => {
+        if (state.orderFilter === "active") {
+          return order.status !== "delivered";
+        }
+
+        if (state.orderFilter === "delivered") {
+          return order.status === "delivered";
+        }
+
+        return true;
+      });
+
+      if (visibleOrders.length === 0) {
+        const emptyText = state.orderFilter === "active"
+          ? "No active orders. Delivered orders are saved in history."
+          : "No orders match this filter.";
+        els.ordersList.innerHTML = `<p class="empty">${emptyText}</p>`;
+        return;
+      }
+
+      els.ordersList.innerHTML = visibleOrders.map(order => {
+        const customer = order.customer || {};
+        const customerLines = [
+          customer.name ? `Name: ${escapeHtml(customer.name)}` : "",
+          customer.phone ? `Phone: ${escapeHtml(customer.phone)}` : "",
+          customer.address ? `Address: ${escapeHtml(customer.address)}` : "",
+          customer.note ? `Note: ${escapeHtml(customer.note)}` : "",
+        ].filter(Boolean);
+
+        return `
+        <article class="order">
+          <div class="order-head">
+            <strong>${order.order_id}</strong>
+            <span class="pill">${order.status}</span>
+            <span>${money(order.total_price)}</span>
+            <select data-status="${order.order_id}">
+              ${["placed", "processing", "delivered"].map(status =>
+                `<option value="${status}" ${order.status === status ? "selected" : ""}>${status}</option>`
+              ).join("")}
+            </select>
+          </div>
+          ${customerLines.length ? `<div class="customer-card"><small>Customer details</small>${customerLines.map(line => `<span>${line}</span>`).join("")}</div>` : ""}
+          <pre>${order.items.map(item =>
+            `${item.product}: ${item.quantity} x ${money(item.unit_price)} = ${money(item.total_price)}`
+          ).join("\n")}</pre>
+        </article>
+      `;
+      }).join("");
+    }
+
+    async function loadBusiness() {
+      try {
+        const businessId = activeBusinessId();
+        const { business } = await api(`/businesses/${businessId}`);
+        fillBusinessForm(business);
+        showDashboard();
+        setStatus(els.businessStatus, `Loaded ${business.name}.`, "good");
+        await Promise.all([loadProducts(), loadOrders()]);
+      } catch (error) {
+        logout(`${error.message}\nPlease log in again.`, "bad");
+      }
+    }
+
+    async function login() {
+      const result = await api("/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: els.authEmail.value.trim(),
+          password: els.authPassword.value,
+        }),
+      });
+
+      state.token = result.token;
+      localStorage.setItem("adminToken", state.token);
+      fillBusinessForm(result.business);
+      els.authPassword.value = "";
+      showDashboard();
+      setStatus(els.businessStatus, `Logged in as ${result.business.name}.`, "good");
+      await Promise.all([loadProducts(), loadOrders()]);
+    }
+
+    function logout(message = "Logged out. Use your business email and password to continue.", type = "") {
+      state.token = "";
+      state.businessId = "";
+      state.business = null;
+      state.products = [];
+      state.orders = [];
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminBusinessId");
+      renderProducts();
+      renderOrders();
+      showAuth(message, type);
+    }
+
+    async function loadProducts() {
+      const businessId = activeBusinessId();
+      const { products } = await api(`/products/${businessId}`);
+      state.products = products;
+      renderProducts();
+    }
+
+    async function loadOrders() {
+      const businessId = activeBusinessId();
+      const { orders } = await api(`/orders/${businessId}`);
+      state.orders = orders;
+      renderOrders();
+    }
+
+    els.businessForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const payload = {
+          businessId: activeBusinessId(),
+          name: els.businessName.value.trim(),
+          email: els.email.value.trim(),
+          currency: els.currency.value,
+          tone: els.tone.value,
+          description: els.businessDescription.value.trim(),
+          contact_info: els.contactInfo.value.trim(),
+          ai_personality: els.aiPersonality.value.trim(),
+        };
+
+        if (els.password.value) {
+          payload.password = els.password.value;
+        }
+
+        const result = await api("/businesses", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        if (result.token) {
+          state.token = result.token;
+          localStorage.setItem("adminToken", state.token);
+        }
+        const { business } = result;
+        fillBusinessForm(business);
+        els.password.value = "";
+        setStatus(els.businessStatus, `Saved ${business.name}.`, "good");
+        await Promise.all([loadProducts(), loadOrders()]);
+      } catch (error) {
+        setStatus(els.businessStatus, error.message, "bad");
+      }
+    });
+
+    els.authForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        const result = await api("/businesses", {
+          method: "POST",
+          body: JSON.stringify({
+            businessId: els.authBusinessId.value.trim(),
+            name: els.authBusinessName.value.trim(),
+            email: els.authEmail.value.trim(),
+            password: els.authPassword.value,
+          }),
+        });
+
+        state.token = result.token;
+        localStorage.setItem("adminToken", state.token);
+        fillBusinessForm(result.business);
+        els.authPassword.value = "";
+        showDashboard();
+        setStatus(els.businessStatus, `Registered ${result.business.name}.`, "good");
+        await Promise.all([loadProducts(), loadOrders()]);
+      } catch (error) {
+        setStatus(els.authStatus, error.message, "bad");
+      }
+    });
+
+    els.authLogin.addEventListener("click", async () => {
+      try {
+        await login();
+      } catch (error) {
+        setStatus(els.authStatus, error.message, "bad");
+      }
+    });
+
+    els.logout.addEventListener("click", () => logout());
+    els.refreshDashboard.addEventListener("click", loadBusiness);
+
+    els.productForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      try {
+        await api("/products", {
+          method: "POST",
+          body: JSON.stringify({
+            businessId: activeBusinessId(),
+            name: els.productName.value.trim(),
+            aliases: els.productAliases.value,
+            price: Number(els.productPrice.value),
+            stock_quantity: Number(els.productStock.value),
+          }),
+        });
+        els.productForm.reset();
+        await loadProducts();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    els.productsTable.addEventListener("click", async event => {
+      const editId = event.target.dataset.edit;
+      const deleteId = event.target.dataset.delete;
+
+      if (editId) {
+        const product = state.products.find(item => item._id === editId);
+        const aliases = prompt("Aliases, separated by commas", (product.aliases || []).join(", "));
+        if (aliases === null) return;
+        const price = prompt("New price", product.price);
+        if (price === null) return;
+        const stock = prompt("New stock", product.stock_quantity);
+        if (stock === null) return;
+        await api(`/products/${editId}`, {
+          method: "PUT",
+          body: JSON.stringify({ aliases, price: Number(price), stock_quantity: Number(stock) }),
+        });
+        await loadProducts();
+      }
+
+      if (deleteId && confirm("Delete this product from the active catalog?")) {
+        await api(`/products/${deleteId}`, {
+          method: "DELETE",
+          body: JSON.stringify({}),
+        });
+        await loadProducts();
+      }
+    });
+
+    els.refreshOrders.addEventListener("click", loadOrders);
+
+    els.orderFilter.addEventListener("change", event => {
+      state.orderFilter = event.target.value;
+      localStorage.setItem("adminOrderFilter", state.orderFilter);
+      renderOrders();
+    });
+
+    els.ordersList.addEventListener("change", async event => {
+      const orderId = event.target.dataset.status;
+      if (!orderId) return;
+
+      await api(`/orders/${orderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          businessId: activeBusinessId(),
+          status: event.target.value,
+        }),
+      });
+      await loadOrders();
+    });
+
+    if (state.token && state.businessId) {
+      loadBusiness();
+    } else {
+      showAuth();
+    }
+  </script>
+</body>
+</html>
