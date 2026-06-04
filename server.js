@@ -254,6 +254,28 @@ function isGreetingOnly(message) {
   return /^(hi|hello|hey|sup|yo|good morning|good afternoon|good evening)\b[!.?\s]*$/i.test(message.trim());
 }
 
+function isProductSelectionResponse(message, product) {
+  if (!product) {
+    return false;
+  }
+
+  const productTerms = getProductSearchTerms(product)
+    .sort((a, b) => b.length - a.length);
+  let remainder = message.toLowerCase();
+
+  for (const term of productTerms) {
+    remainder = remainder.replace(new RegExp(`\\b${escapeRegExp(term)}\\b`, "gi"), " ");
+  }
+
+  remainder = remainder
+    .replace(/\b(okay|ok|yes|yeah|yep|sure|please|pls|give me|i want|i need|i'll take|i will take|let me get|can i get|the|a|an|one)\b/gi, " ")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return remainder.length === 0;
+}
+
 function extractQuantity(message) {
   const match = message.match(/\d+/);
   if (match) {
@@ -731,6 +753,24 @@ function clearCompletedOrderContext(memory) {
   if (memory.lastIntent === "order_completed" || memory.lastIntent === "post_order_thanks") {
     memory.lastIntent = null;
   }
+}
+
+function startPendingOrderForProduct(memory, product) {
+  clearCompletedOrderContext(memory);
+
+  memory.pendingOrder = {
+    items: [{
+      product_id: product._id,
+      product: product.name,
+      quantity: null,
+      unit_price: product.price,
+      total_price: null,
+    }],
+    total_price: 0,
+  };
+  memory.lastProduct = product.name;
+  memory.lastIntent = "order";
+  memory.awaitingProductChoice = null;
 }
 
 async function checkStockAvailability(items, businessId) {
@@ -1501,6 +1541,52 @@ async function chatHandler(req, res) {
       ? Number(aiIntent.quantity)
       : null;
 
+    const selectedProductResponse = aiProduct || productFromMessage;
+
+    if (!memory.pendingOrder && isProductSelectionResponse(message, selectedProductResponse)) {
+      const quantityFromMessage = aiQuantity ||
+        extractQuantityWithoutProductTerms(message, selectedProductResponse);
+
+      if (quantityFromMessage) {
+        const orderItems = normalizeOrderItems(
+          [{ product: selectedProductResponse.name, quantity: quantityFromMessage }],
+          null,
+          null,
+          message,
+          products
+        );
+        const stockCheck = await checkStockAvailability(orderItems, businessId);
+
+        if (!stockCheck.ok) {
+          return res.status(stockCheck.status).json({
+            reply: stockCheck.reply,
+            order: null,
+          });
+        }
+
+        clearCompletedOrderContext(memory);
+        memory.pendingOrder = {
+          items: orderItems,
+          total_price: getOrderTotal(orderItems),
+        };
+        memory.lastProduct = selectedProductResponse.name;
+        memory.lastIntent = "order";
+        memory.awaitingProductChoice = null;
+
+        return res.json({
+          reply: `Great choice!\n\n🛒 Order Summary:\n${formatOrderItems(orderItems, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+          order: null,
+        });
+      }
+
+      startPendingOrderForProduct(memory, selectedProductResponse);
+
+      return res.json({
+        reply: `Nice choice! 👌\n\nHow many ${selectedProductResponse.name} would you like?`,
+        order: null,
+      });
+    }
+
     if (aiIntent?.intent === "greeting" || aiIntent?.intent === "business_chat") {
       memory.lastIntent = "chat";
 
@@ -1534,6 +1620,54 @@ async function chatHandler(req, res) {
 
         return res.json({
           reply: `${selectedProduct.name} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
+          order: null,
+        });
+      }
+    }
+
+    if (!memory.pendingOrder && aiIntent?.intent === "start_order") {
+      const selectedProduct = aiProduct || productFromMessage ||
+        (memory.lastProduct ? findProductByName(memory.lastProduct, products) : null);
+
+      if (selectedProduct) {
+        const quantityFromMessage = aiQuantity || extractQuantityWithoutProductTerms(message, selectedProduct);
+
+        if (quantityFromMessage) {
+          const orderItems = normalizeOrderItems(
+            [{ product: selectedProduct.name, quantity: quantityFromMessage }],
+            null,
+            null,
+            message,
+            products
+          );
+          const stockCheck = await checkStockAvailability(orderItems, businessId);
+
+          if (!stockCheck.ok) {
+            return res.status(stockCheck.status).json({
+              reply: stockCheck.reply,
+              order: null,
+            });
+          }
+
+          clearCompletedOrderContext(memory);
+          memory.pendingOrder = {
+            items: orderItems,
+            total_price: getOrderTotal(orderItems),
+          };
+          memory.lastProduct = selectedProduct.name;
+          memory.lastIntent = "order";
+          memory.awaitingProductChoice = null;
+
+          return res.json({
+            reply: `Great choice!\n\n🛒 Order Summary:\n${formatOrderItems(orderItems, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+            order: null,
+          });
+        }
+
+        startPendingOrderForProduct(memory, selectedProduct);
+
+        return res.json({
+          reply: `Nice choice! 👌\n\nHow many ${selectedProduct.name} would you like?`,
           order: null,
         });
       }
@@ -1787,6 +1921,17 @@ async function chatHandler(req, res) {
         ? resolveProductChoice(message, pendingChoices)
         : null;
       const pendingAmbiguousChoice = findAmbiguousProductChoice(message, products);
+
+      const missingQuantityItem = memory.pendingOrder.items.find(item => !item.quantity);
+
+      if (missingQuantityItem && isYes(message)) {
+        memory.lastProduct = missingQuantityItem.product;
+
+        return res.json({
+          reply: `Almost there. How many ${missingQuantityItem.product} would you like?`,
+          order: null,
+        });
+      }
 
       if (memory.awaitingProductChoice) {
         const selectedChoiceQuantity = selectedProductChoice
