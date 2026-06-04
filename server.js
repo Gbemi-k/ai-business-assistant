@@ -232,6 +232,10 @@ function isNo(message) {
   return /(no|nah|cancel|stop|don’t|dont|never mind)/i.test(message);
 }
 
+function isThanks(message) {
+  return /\b(thank you|thanks|thank u|tnx|appreciate it)\b/i.test(message);
+}
+
 function isOrderRequest(message) {
   return /\b(i want|i need|i would like|i will like|i'll like|buy|order|get|take|purchase)\b/.test(message);
 }
@@ -659,6 +663,14 @@ ${formatOrderItems(order.items, currency)}
 Total: ${formatMoney(order.total_price, currency)}`;
 }
 
+function formatPostOrderThanksReply(order, business, currency = "$") {
+  const contactLine = business.contact_info
+    ? ` We'll contact you through ${business.contact_info} if we need anything else.`
+    : " We'll use the details you provided to follow up.";
+
+  return `You're welcome! Your order ${order.order_id} is confirmed for ${formatMoney(order.total_price, currency)}.${contactLine}`;
+}
+
 function formatOrderList(orders, currency = "$") {
   return orders
     .map(order => `${order.order_id} - ${order.items.length} item${order.items.length === 1 ? "" : "s"} - ${formatMoney(order.total_price, currency)} - ${order.status}`)
@@ -711,6 +723,14 @@ function addOrUpdateOrderItem(order, product, quantity) {
   }
 
   order.total_price = getOrderTotal(order.items);
+}
+
+function clearCompletedOrderContext(memory) {
+  memory.lastCompletedOrder = null;
+
+  if (memory.lastIntent === "order_completed" || memory.lastIntent === "post_order_thanks") {
+    memory.lastIntent = null;
+  }
 }
 
 async function checkStockAvailability(items, businessId) {
@@ -1311,6 +1331,15 @@ async function chatHandler(req, res) {
     const memory = userMemory[userId][businessId];
     const requestedOrderId = extractOrderId(message);
 
+    if (!memory.pendingOrder && memory.lastCompletedOrder && isThanks(message)) {
+      memory.lastIntent = "post_order_thanks";
+
+      return res.json({
+        reply: formatPostOrderThanksReply(memory.lastCompletedOrder, business, currency),
+        order: memory.lastCompletedOrder,
+      });
+    }
+
     if (requestedOrderId) {
       const order = await Order.findOne({ order_id: requestedOrderId, businessId, userId }).lean();
 
@@ -1437,6 +1466,8 @@ async function chatHandler(req, res) {
       const orderData = savedOrder.toObject();
       memory.pendingOrder = null;
       memory.awaitingProductChoice = null;
+      memory.lastCompletedOrder = orderData;
+      memory.lastIntent = "order_completed";
 
       return res.json({
         reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
@@ -1513,6 +1544,8 @@ async function chatHandler(req, res) {
         (memory.lastProduct ? findProductByName(memory.lastProduct, products) : null);
 
       if (selectedProduct) {
+        clearCompletedOrderContext(memory);
+
         if (selectedProduct.stock_quantity <= 0) {
           return res.json({
             reply: `Sorry, ${selectedProduct.name} is currently out of stock.`,
@@ -1562,6 +1595,8 @@ async function chatHandler(req, res) {
         : null;
 
       if (selectedProduct) {
+        clearCompletedOrderContext(memory);
+
         const previousOrder = JSON.parse(JSON.stringify(memory.pendingOrder));
         addOrUpdateOrderItem(memory.pendingOrder, selectedProduct, aiQuantity);
         memory.pendingOrder.total_price = getOrderTotal(memory.pendingOrder.items);
@@ -1589,6 +1624,8 @@ async function chatHandler(req, res) {
       const selectedProduct = findProductByName(memory.lastProduct, products);
 
       if (selectedProduct) {
+        clearCompletedOrderContext(memory);
+
         memory.pendingOrder = {
           items: [{
             product_id: selectedProduct._id,
@@ -1697,6 +1734,8 @@ async function chatHandler(req, res) {
     }
 
     if (!memory.pendingOrder && isOrderRequest(message) && ambiguousProductChoice) {
+      clearCompletedOrderContext(memory);
+
       const ambiguousProductIds = new Set(
         ambiguousProductChoice.matches.map(product => product._id.toString())
       );
@@ -2019,6 +2058,9 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 
         const orderData = savedOrder.toObject();
         memory.pendingOrder = null;
+        memory.awaitingProductChoice = null;
+        memory.lastCompletedOrder = orderData;
+        memory.lastIntent = "order_completed";
 
         return res.json({
           reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
@@ -2179,6 +2221,8 @@ RULES:
     // 🛡️ BACKEND SAFETY
     // =============================
     if (intent === "order") {
+      clearCompletedOrderContext(memory);
+
       let orderItems = normalizeOrderItems(items, product, quantity, message, products);
 
       if (orderItems.length === 0 && mentionedProduct) {
