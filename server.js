@@ -1576,6 +1576,10 @@ async function chatHandler(req, res) {
         ? `\n\nYour pending order is still here:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}`
         : "";
 
+      if (matchingProducts.length === 1) {
+        memory.lastProduct = matchingProducts[0].name;
+      }
+
       memory.lastIntent = aiIntent.intent;
 
       return res.json({
