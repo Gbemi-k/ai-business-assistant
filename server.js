@@ -916,6 +916,75 @@ JSON shape:
   return JSON.parse(response.choices[0].message.content);
 }
 
+async function getAiCompletedOrderFollowup({ message, business, order, currency }) {
+  const followupPrompt = `
+You are helping a customer after they just placed an order.
+
+Your task:
+1. Decide if the customer's message is about the completed order.
+2. If yes, answer naturally using the order and business context.
+3. If no, return is_followup false and an empty reply.
+
+Classify as follow-up if the customer asks about:
+- delivery, pickup, arrival time, ETA, when to expect it
+- order status, order ID, what happens next
+- changing/cancelling after placing the order
+- payment or contact about the placed order
+- appreciation/closing messages like thanks or thank you
+
+Do NOT classify as follow-up if the customer:
+- wants to start a new order
+- asks what products are available
+- asks price/stock for products
+- changes topic to normal product browsing
+- sends a fresh greeting that is not about the order
+
+Important:
+- Do not create, cancel, or modify orders.
+- Do not promise an exact delivery/pickup time unless the business context clearly says one.
+- If timing is unknown, say the business will contact them using their provided details.
+- If the message is appreciation/thanks after the order, mention that the order is confirmed or received and include the order ID.
+- Keep the reply short and helpful.
+
+Business:
+${JSON.stringify({
+  name: business.name,
+  tone: business.tone,
+  currency: business.currency,
+  description: business.description || "",
+  contact_info: business.contact_info || "",
+  ai_personality: business.ai_personality || "",
+}, null, 2)}
+
+Completed order:
+${JSON.stringify({
+  order_id: order.order_id,
+  status: order.status,
+  total_price: order.total_price,
+  currency,
+  items: order.items,
+  customer: order.customer || {},
+}, null, 2)}
+
+Return JSON only:
+{
+  "is_followup": boolean,
+  "reply": string
+}
+`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: followupPrompt },
+      { role: "user", content: message },
+    ],
+  });
+
+  return JSON.parse(response.choices[0].message.content);
+}
+
 app.post("/businesses", async (req, res) => {
   try {
     const { businessId, name, email, password, currency, tone, description, contact_info, ai_personality } = req.body;
@@ -1364,6 +1433,26 @@ async function chatHandler(req, res) {
       });
     }
 
+    if (!memory.pendingOrder && memory.lastCompletedOrder) {
+      try {
+        const followup = await getAiCompletedOrderFollowup({
+          message,
+          business,
+          order: memory.lastCompletedOrder,
+          currency,
+        });
+
+        if (followup?.is_followup && followup.reply) {
+          return res.json({
+            reply: followup.reply,
+            order: memory.lastCompletedOrder,
+          });
+        }
+      } catch (error) {
+        console.error("Completed order follow-up error:", error.message);
+      }
+    }
+
     const products = await Product.find({ businessId, active: true }).lean();
     const validProductNames = products.map(p => p.name.toLowerCase());
 
@@ -1437,6 +1526,8 @@ async function chatHandler(req, res) {
       const orderData = savedOrder.toObject();
       memory.pendingOrder = null;
       memory.awaitingProductChoice = null;
+      memory.lastCompletedOrder = orderData;
+      memory.lastIntent = "order_completed";
 
       return res.json({
         reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
@@ -2019,6 +2110,9 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 
         const orderData = savedOrder.toObject();
         memory.pendingOrder = null;
+        memory.awaitingProductChoice = null;
+        memory.lastCompletedOrder = orderData;
+        memory.lastIntent = "order_completed";
 
         return res.json({
           reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
