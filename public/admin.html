@@ -209,7 +209,7 @@
       align-items: end;
       display: grid;
       gap: 10px;
-      grid-template-columns: 0.8fr 1.2fr 1.3fr 0.8fr 0.7fr 0.9fr auto;
+      grid-template-columns: 0.75fr 1.05fr 1.05fr 1.2fr 0.75fr 0.7fr 0.85fr auto;
     }
 
     .actions {
@@ -512,6 +512,9 @@
           <label>Name
             <input id="productName" required placeholder="e.g. 75cl packs or haircut">
           </label>
+          <label>Option / Package
+            <input id="productOption" placeholder="e.g. medium with design">
+          </label>
           <label>Aliases
             <input id="productAliases" placeholder="Other names customers may type">
           </label>
@@ -526,13 +529,14 @@
           </label>
           <button type="submit">Add</button>
         </form>
-        <p class="empty">Tip: aliases are simple words customers may use instead of the exact name. Example: for "vanilla cake", aliases can be "vanilla, cake"; for "home cleaning", aliases can be "cleaning, house cleaning".</p>
+        <p class="empty">Tip: use Option / Package for variations with the same name. Example: name "gel nails", option "medium with design". Aliases are simple words customers may type, like "nails, gel".</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Type</th>
                 <th>Name</th>
+                <th>Option</th>
                 <th>Aliases</th>
                 <th>Price</th>
                 <th>Stock / Duration</th>
@@ -600,6 +604,7 @@
       productForm: document.querySelector("#productForm"),
       productType: document.querySelector("#productType"),
       productName: document.querySelector("#productName"),
+      productOption: document.querySelector("#productOption"),
       productAliases: document.querySelector("#productAliases"),
       productPrice: document.querySelector("#productPrice"),
       stockField: document.querySelector("#stockField"),
@@ -624,6 +629,7 @@
       els.productStock.value = isService ? "" : els.productStock.value;
       els.productDuration.value = isService ? els.productDuration.value : "";
       els.productName.placeholder = isService ? "e.g. haircut or home cleaning" : "e.g. 75cl packs";
+      els.productOption.placeholder = isService ? "e.g. medium with design or home visit" : "e.g. 12 pieces or family size";
       els.productAliases.placeholder = isService ? "e.g. cleaning, haircut" : "e.g. water, small water";
     }
 
@@ -741,6 +747,7 @@
         <tr>
           <td><span class="pill">${product.type || "product"}</span></td>
           <td><strong>${product.name}</strong></td>
+          <td>${product.option || "-"}</td>
           <td>${(product.aliases || []).join(", ") || "-"}</td>
           <td>${money(product.price)}</td>
           <td>${product.type === "service" ? (product.duration || "service") : product.stock_quantity}</td>
@@ -753,7 +760,7 @@
       `).join("");
 
       if (state.products.length === 0) {
-        els.productsTable.innerHTML = `<tr><td colspan="7" class="empty">No active products or services yet. Add one above. Example product: vanilla cake, stock 10. Example service: home cleaning, duration 2 hours.</td></tr>`;
+        els.productsTable.innerHTML = `<tr><td colspan="8" class="empty">No active products or services yet. Add one above. Example product: vanilla cake, stock 10. Example service: home cleaning, duration 2 hours.</td></tr>`;
       }
     }
 
@@ -960,6 +967,7 @@
             businessId: activeBusinessId(),
             type: els.productType.value,
             name: els.productName.value.trim(),
+            option: els.productOption.value.trim(),
             aliases: els.productAliases.value,
             price: Number(els.productPrice.value),
             stock_quantity: Number(els.productStock.value || 0),
@@ -982,6 +990,8 @@
         const product = state.products.find(item => item._id === editId);
         const type = prompt("Type: product or service", product.type || "product");
         if (type === null) return;
+        const option = prompt("Option / package, optional", product.option || "");
+        if (option === null) return;
         const aliases = prompt("Aliases, separated by commas", (product.aliases || []).join(", "));
         if (aliases === null) return;
         const price = prompt("New price", product.price);
@@ -994,6 +1004,7 @@
           method: "PUT",
           body: JSON.stringify({
             type,
+            option,
             aliases,
             price: Number(price),
             stock_quantity: Number(stock || 0),

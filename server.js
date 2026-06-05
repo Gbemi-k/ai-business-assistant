@@ -161,6 +161,7 @@ const productSchema = new mongoose.Schema(
     businessId: { type: String, required: true, index: true },
     type: { type: String, enum: ["product", "service"], default: "product", index: true },
     name: { type: String, required: true, trim: true },
+    option: { type: String, default: "", trim: true },
     aliases: { type: [String], default: [] },
     price: { type: Number, required: true, min: 0 },
     stock_quantity: { type: Number, default: 0, min: 0 },
@@ -171,7 +172,7 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-productSchema.index({ businessId: 1, name: 1 }, { unique: true });
+productSchema.index({ businessId: 1, name: 1, option: 1 }, { unique: true });
 
 const Product = mongoose.model("Product", productSchema);
 
@@ -229,6 +230,31 @@ const orderCounterSchema = new mongoose.Schema(
 orderCounterSchema.index({ businessId: 1, date: 1 }, { unique: true });
 
 const OrderCounter = mongoose.model("OrderCounter", orderCounterSchema);
+
+async function ensureOfferingIndexes() {
+  try {
+    const indexes = await Product.collection.indexes();
+    const oldNameIndex = indexes.find(index =>
+      index.name === "businessId_1_name_1" &&
+      index.unique &&
+      index.key?.businessId === 1 &&
+      index.key?.name === 1 &&
+      index.key?.option === undefined
+    );
+
+    if (oldNameIndex) {
+      await Product.collection.dropIndex(oldNameIndex.name);
+      console.log("Dropped old unique offering name index");
+    }
+
+    await Product.collection.createIndex(
+      { businessId: 1, name: 1, option: 1 },
+      { unique: true, name: "businessId_1_name_1_option_1" }
+    );
+  } catch (error) {
+    console.warn("Offering index check warning:", error.message);
+  }
+}
 
 // ✅ BETTER YES / NO DETECTION
 function isYes(message) {
@@ -414,7 +440,8 @@ function normalizeAliases(aliases) {
 }
 
 function getProductSearchTerms(product) {
-  return [product.name, ...(product.aliases || [])]
+  return [product.name, product.option, offeringDisplayName(product), ...(product.aliases || [])]
+    .filter(Boolean)
     .flatMap(term => getProductNameVariants(term))
     .filter(Boolean);
 }
@@ -439,7 +466,7 @@ function findProductByName(name, products) {
 
 function getProductKeywords(product) {
   return [...new Set(
-    [product.name, ...(product.aliases || [])]
+    [product.name, product.option, ...(product.aliases || [])]
       .join(" ")
       .toLowerCase()
       .split(/\s+/)
@@ -453,7 +480,7 @@ function hasWord(message, word) {
 }
 
 function formatProductChoices(products) {
-  const names = products.map(product => product.name);
+  const names = products.map(product => offeringDisplayName(product));
 
   if (names.length <= 2) {
     return names.join(" or ");
@@ -480,6 +507,15 @@ function normalizedOfferingType(type) {
   return type === "service" ? "service" : "product";
 }
 
+function normalizeOfferingOption(option) {
+  return String(option || "").toLowerCase().trim();
+}
+
+function offeringDisplayName(product) {
+  const option = normalizeOfferingOption(product?.option);
+  return option ? `${product.name} - ${option}` : product.name;
+}
+
 function orderQuantityForOffering(product, quantity) {
   const numericQuantity = Number(quantity);
 
@@ -493,13 +529,15 @@ function orderQuantityForOffering(product, quantity) {
 function formatProductCatalog(products, currency = "$") {
   return products
     .map(product => {
+      const displayName = offeringDisplayName(product);
+
       if (isServiceOffering(product)) {
         const duration = product.duration ? `, ${product.duration}` : "";
         const booking = product.requires_booking_time ? ", booking time needed" : "";
-        return `- ${product.name}: ${formatMoney(product.price, currency)}${duration}${booking}`;
+        return `- ${displayName}: ${formatMoney(product.price, currency)}${duration}${booking}`;
       }
 
-      return `- ${product.name}: ${formatMoney(product.price, currency)} (${product.stock_quantity} in stock)`;
+      return `- ${displayName}: ${formatMoney(product.price, currency)} (${product.stock_quantity} in stock)`;
     })
     .join("\n");
 }
@@ -659,7 +697,7 @@ function extractOrderItems(message, products) {
       return {
         product_id: product._id,
         type: normalizedOfferingType(product.type),
-        product: product.name,
+        product: offeringDisplayName(product),
         quantity,
         unit_price: product.price,
         total_price: quantity ? product.price * quantity : null,
@@ -692,7 +730,7 @@ function normalizeOrderItems(aiItems, fallbackProduct, fallbackQuantity, message
       return {
         product_id: selectedProduct._id,
         type: normalizedOfferingType(selectedProduct.type),
-        product: selectedProduct.name,
+        product: offeringDisplayName(selectedProduct),
         quantity,
         unit_price: selectedProduct.price,
         total_price: quantity ? selectedProduct.price * quantity : null,
@@ -757,7 +795,8 @@ function isAllOrdersRequest(message) {
 }
 
 function addOrUpdateOrderItem(order, product, quantity) {
-  const existingItem = order.items.find(item => item.product === product.name);
+  const displayName = offeringDisplayName(product);
+  const existingItem = order.items.find(item => item.product_id.toString() === product._id.toString());
 
   if (existingItem) {
     existingItem.quantity = quantity;
@@ -766,7 +805,7 @@ function addOrUpdateOrderItem(order, product, quantity) {
     order.items.push({
       product_id: product._id,
       type: normalizedOfferingType(product.type),
-      product: product.name,
+      product: displayName,
       quantity,
       unit_price: product.price,
       total_price: quantity * product.price,
@@ -849,7 +888,8 @@ function removeZeroStockPendingItems(memory, products) {
   const removedItems = [];
 
   for (const item of [...memory.pendingOrder.items]) {
-    const product = products.find(candidate => candidate.name === item.product);
+    const product = products.find(candidate => candidate._id.toString() === item.product_id.toString()) ||
+      findProductByName(item.product, products);
 
     if (!product || (!isServiceOffering(product) && product.stock_quantity <= 0)) {
       removeOrderItem(memory.pendingOrder, item.product);
@@ -1212,7 +1252,7 @@ async function loadPublicBusiness(req, res, next) {
 
 app.post("/products", requireAuth, async (req, res) => {
   try {
-    const { name, price, stock_quantity, aliases, type, duration, requires_booking_time } = req.body;
+    const { name, option, price, stock_quantity, aliases, type, duration, requires_booking_time } = req.body;
     const businessId = req.businessId;
 
     if (!requireMatchingBusiness(req, res, req.body.businessId || businessId)) {
@@ -1234,6 +1274,7 @@ app.post("/products", requireAuth, async (req, res) => {
     }
 
     const normalizedName = name.toLowerCase().trim();
+    const normalizedOption = normalizeOfferingOption(option);
     const offeringType = normalizedOfferingType(type);
     const numericStock = stock_quantity === undefined ? null : Number(stock_quantity);
 
@@ -1247,6 +1288,7 @@ app.post("/products", requireAuth, async (req, res) => {
       businessId,
       type: offeringType,
       name: normalizedName,
+      option: normalizedOption,
       aliases: normalizeAliases(aliases),
       price: numericPrice,
       duration: duration || "",
@@ -1260,14 +1302,16 @@ app.post("/products", requireAuth, async (req, res) => {
       update.stock_quantity = numericStock;
     }
 
-    const product = await Product.findOneAndUpdate(
-      { businessId, name: normalizedName },
-      update,
-      { returnDocument: "after", upsert: true, runValidators: true }
-    );
+    const product = await Product.create(update);
 
     return res.status(201).json({ product });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        error: "This name and option already exists. Use a different option/package name, or edit the existing one.",
+      });
+    }
+
     return res.status(500).json({ error: "Could not save product." });
   }
 });
@@ -1294,7 +1338,7 @@ app.get("/products/:businessId", requireAuth, async (req, res) => {
 // 🚀 MAIN ENDPOINT
 app.put("/products/:id", requireAuth, async (req, res) => {
   try {
-    const { name, price, stock_quantity, aliases, active, type, duration, requires_booking_time } = req.body;
+    const { name, option, price, stock_quantity, aliases, active, type, duration, requires_booking_time } = req.body;
     const update = {};
     const existingProduct = await Product.findById(req.params.id).lean();
 
@@ -1308,6 +1352,10 @@ app.put("/products/:id", requireAuth, async (req, res) => {
 
     if (name !== undefined) {
       update.name = String(name).toLowerCase().trim();
+    }
+
+    if (option !== undefined) {
+      update.option = normalizeOfferingOption(option);
     }
 
     if (aliases !== undefined) {
@@ -1366,6 +1414,12 @@ app.put("/products/:id", requireAuth, async (req, res) => {
 
     return res.json({ product });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        error: "This name and option already exists. Use a different option/package name.",
+      });
+    }
+
     return res.status(500).json({ error: "Could not update product." });
   }
 });
@@ -1552,7 +1606,7 @@ async function chatHandler(req, res) {
     }
 
     const products = await Product.find({ businessId, active: true }).lean();
-    const validProductNames = products.map(p => p.name.toLowerCase());
+    const validProductNames = products.map(p => offeringDisplayName(p).toLowerCase());
 
     if (products.length === 0) {
       return res.json({
@@ -1566,6 +1620,8 @@ async function chatHandler(req, res) {
     const productsForPrompt = products.map(product => ({
       type: normalizedOfferingType(product.type),
       name: product.name,
+      option: product.option || "",
+      display_name: offeringDisplayName(product),
       aliases: product.aliases || [],
       price: product.price,
       stock_quantity: product.stock_quantity,
@@ -1652,7 +1708,7 @@ async function chatHandler(req, res) {
     let aiIntent = null;
 
     if (!memory.pendingOrder && memory.lastCatalog?.length && isCatalogConfirmationFollowup(message)) {
-      const catalogProducts = products.filter(product => memory.lastCatalog.includes(product.name));
+      const catalogProducts = products.filter(product => memory.lastCatalog.includes(offeringDisplayName(product)));
 
       return res.json({
         reply: `Yes. This is the current list I have for ${business.name}:\n\n${formatProductCatalog(catalogProducts.length ? catalogProducts : products, currency)}\n\nIf something is missing, the business owner may need to add it in the admin dashboard.`,
@@ -1662,7 +1718,7 @@ async function chatHandler(req, res) {
 
     if (!memory.pendingOrder && memory.awaitingBusinessFollowup?.action === "show_catalog" && isYes(message)) {
       memory.awaitingBusinessFollowup = null;
-      memory.lastCatalog = products.map(product => product.name);
+      memory.lastCatalog = products.map(product => offeringDisplayName(product));
       memory.lastIntent = "browse_products";
 
       return res.json({
@@ -1702,10 +1758,10 @@ async function chatHandler(req, res) {
         : "";
 
       if (matchingProducts.length === 1) {
-        memory.lastProduct = matchingProducts[0].name;
+        memory.lastProduct = offeringDisplayName(matchingProducts[0]);
       }
 
-      memory.lastCatalog = matchingProducts.map(product => product.name);
+      memory.lastCatalog = matchingProducts.map(product => offeringDisplayName(product));
       memory.lastIntent = aiIntent.intent;
 
       return res.json({
@@ -1719,11 +1775,11 @@ async function chatHandler(req, res) {
         (memory.lastProduct ? findProductByName(memory.lastProduct, products) : null);
 
       if (selectedProduct) {
-        memory.lastProduct = selectedProduct.name;
+        memory.lastProduct = offeringDisplayName(selectedProduct);
         memory.lastIntent = "price_check";
 
         return res.json({
-          reply: `${selectedProduct.name} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
+          reply: `${offeringDisplayName(selectedProduct)} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
           order: null,
         });
       }
@@ -1736,7 +1792,7 @@ async function chatHandler(req, res) {
       if (selectedProduct) {
         if (selectedProduct.stock_quantity <= 0) {
           return res.json({
-            reply: `Sorry, ${selectedProduct.name} is currently out of stock.`,
+            reply: `Sorry, ${offeringDisplayName(selectedProduct)} is currently out of stock.`,
             order: null,
           });
         }
@@ -1765,12 +1821,12 @@ async function chatHandler(req, res) {
           });
         }
 
-        memory.lastProduct = selectedProduct.name;
+        memory.lastProduct = offeringDisplayName(selectedProduct);
         memory.awaitingProductChoice = null;
         memory.lastIntent = "order";
 
         return res.json({
-          reply: `Got it. I've set ${selectedProduct.name} to all available stock (${selectedProduct.stock_quantity}).\n\n🛒 Order Summary:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+          reply: `Got it. I've set ${offeringDisplayName(selectedProduct)} to all available stock (${selectedProduct.stock_quantity}).\n\n🛒 Order Summary:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
           order: null,
         });
       }
@@ -1779,7 +1835,7 @@ async function chatHandler(req, res) {
     if (aiIntent?.intent === "change_quantity" && memory.pendingOrder && aiQuantity && (aiProduct || memory.lastProduct)) {
       const selectedProduct = aiProduct || findProductByName(memory.lastProduct, products);
       const existingItem = selectedProduct
-        ? memory.pendingOrder.items.find(item => item.product === selectedProduct.name)
+        ? memory.pendingOrder.items.find(item => item.product_id.toString() === selectedProduct._id.toString())
         : null;
 
       if (selectedProduct) {
@@ -1796,7 +1852,7 @@ async function chatHandler(req, res) {
           });
         }
 
-        memory.lastProduct = selectedProduct.name;
+        memory.lastProduct = offeringDisplayName(selectedProduct);
         memory.awaitingProductChoice = null;
 
         return res.json({
@@ -1813,17 +1869,19 @@ async function chatHandler(req, res) {
         memory.pendingOrder = {
           items: [{
             product_id: selectedProduct._id,
-            product: selectedProduct.name,
+            type: normalizedOfferingType(selectedProduct.type),
+            product: offeringDisplayName(selectedProduct),
             quantity: null,
             unit_price: selectedProduct.price,
             total_price: null,
+            duration: selectedProduct.duration || "",
           }],
           total_price: 0,
         };
         memory.lastIntent = "order";
 
         return res.json({
-          reply: `Nice choice! 👌\n\nHow many ${selectedProduct.name} would you like?`,
+          reply: `Nice choice! 👌\n\nHow many ${offeringDisplayName(selectedProduct)} would you like?`,
           order: null,
         });
       }
@@ -1840,17 +1898,17 @@ async function chatHandler(req, res) {
 
     if (!memory.pendingOrder && memory.awaitingProductChoice?.action === "price_check") {
       const pendingChoices = memory.awaitingProductChoice.choices
-        ? products.filter(product => memory.awaitingProductChoice.choices.includes(product.name))
+        ? products.filter(product => memory.awaitingProductChoice.choices.includes(offeringDisplayName(product)))
         : products;
       const selectedProduct = resolveProductChoice(message, pendingChoices) || productFromMessage;
 
       if (selectedProduct) {
-        memory.lastProduct = selectedProduct.name;
+        memory.lastProduct = offeringDisplayName(selectedProduct);
         memory.lastIntent = "price_check";
         memory.awaitingProductChoice = null;
 
         return res.json({
-          reply: `${selectedProduct.name} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
+          reply: `${offeringDisplayName(selectedProduct)} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
           order: null,
         });
       }
@@ -1872,7 +1930,7 @@ async function chatHandler(req, res) {
         memory.lastCategory = productCategory.keyword;
       }
 
-      memory.lastCatalog = matchingProducts.map(product => product.name);
+      memory.lastCatalog = matchingProducts.map(product => offeringDisplayName(product));
       memory.lastIntent = "browse";
 
       return res.json({
@@ -1886,11 +1944,11 @@ async function chatHandler(req, res) {
         (memory.lastProduct ? findProductByName(memory.lastProduct, products) : null);
 
       if (selectedProduct) {
-        memory.lastProduct = selectedProduct.name;
+        memory.lastProduct = offeringDisplayName(selectedProduct);
         memory.lastIntent = "price_check";
 
         return res.json({
-          reply: `${selectedProduct.name} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
+          reply: `${offeringDisplayName(selectedProduct)} is ${formatMoney(selectedProduct.price, currency)}. Would you like to order it?`,
           order: null,
         });
       }
@@ -1903,7 +1961,7 @@ async function chatHandler(req, res) {
         memory.awaitingProductChoice = {
           action: "price_check",
           keyword: category.keyword,
-          choices: category.matches.map(product => product.name),
+          choices: category.matches.map(product => offeringDisplayName(product)),
         };
 
         return res.json({
@@ -1945,7 +2003,7 @@ async function chatHandler(req, res) {
         action: "order",
         keyword: ambiguousProductChoice.keyword,
         quantity: requestedQty,
-        choices: ambiguousProductChoice.matches.map(product => product.name),
+        choices: ambiguousProductChoice.matches.map(product => offeringDisplayName(product)),
       };
 
       const summary = orderItems.length > 0
@@ -1966,7 +2024,7 @@ async function chatHandler(req, res) {
       const newQty = extractQuantity(message);
       const newProduct = extractProduct(message, products);
       const pendingChoices = memory.awaitingProductChoice?.choices
-        ? products.filter(product => memory.awaitingProductChoice.choices.includes(product.name))
+        ? products.filter(product => memory.awaitingProductChoice.choices.includes(offeringDisplayName(product)))
         : [];
       const selectedProductChoice = pendingChoices.length > 0
         ? resolveProductChoice(message, pendingChoices)
@@ -2003,7 +2061,7 @@ async function chatHandler(req, res) {
             });
           }
 
-          memory.lastProduct = selectedProduct.name;
+          memory.lastProduct = offeringDisplayName(selectedProduct);
           memory.awaitingProductChoice = null;
 
           return res.json({
@@ -2023,11 +2081,11 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
           const qty = memory.awaitingProductChoice.quantity;
 
           if (!qty) {
-            memory.lastProduct = selectedProductChoice.name;
-            memory.awaitingProductChoice.product = selectedProductChoice.name;
+            memory.lastProduct = offeringDisplayName(selectedProductChoice);
+            memory.awaitingProductChoice.product = offeringDisplayName(selectedProductChoice);
 
             return res.json({
-              reply: `Nice choice! 👌\n\nHow many ${selectedProductChoice.name} would you like?`,
+              reply: `Nice choice! 👌\n\nHow many ${offeringDisplayName(selectedProductChoice)} would you like?`,
               order: null,
             });
           }
@@ -2044,7 +2102,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
             });
           }
 
-          memory.lastProduct = selectedProductChoice.name;
+          memory.lastProduct = offeringDisplayName(selectedProductChoice);
           memory.awaitingProductChoice = null;
 
           return res.json({
@@ -2085,7 +2143,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
           action: "order",
           keyword: pendingAmbiguousChoice.keyword,
           quantity: newQty || null,
-          choices: pendingAmbiguousChoice.matches.map(product => product.name),
+          choices: pendingAmbiguousChoice.matches.map(product => offeringDisplayName(product)),
         };
 
         return res.json({
@@ -2101,7 +2159,8 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         const unavailableItems = [];
 
         for (const item of memory.pendingOrder.items) {
-          const product = products.find(candidate => candidate.name === item.product);
+          const product = products.find(candidate => candidate._id.toString() === item.product_id.toString()) ||
+            findProductByName(item.product, products);
           if (product && item.quantity > product.stock_quantity) {
             unavailableItems.push(item.product);
           }
@@ -2112,7 +2171,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         }
 
         const existingItem = memory.pendingOrder.items.find(
-          item => item.product === newProduct.name
+          item => item.product_id.toString() === newProduct._id.toString()
         );
 
         if (existingItem) {
@@ -2121,10 +2180,12 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         } else {
           memory.pendingOrder.items.push({
             product_id: newProduct._id,
-            product: newProduct.name,
+            type: normalizedOfferingType(newProduct.type),
+            product: offeringDisplayName(newProduct),
             quantity: qty,
             unit_price: newProduct.price,
             total_price: qty * newProduct.price,
+            duration: newProduct.duration || "",
           });
         }
 
@@ -2132,7 +2193,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
         if (!stockCheck.ok) {
-          if (stockCheck.item?.product === newProduct.name) {
+          if (stockCheck.item?.product_id?.toString() === newProduct._id.toString()) {
             memory.pendingOrder = previousOrder;
           } else {
             clearUnavailablePendingItem(memory, stockCheck);
@@ -2143,7 +2204,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
           });
         }
 
-        memory.lastProduct = newProduct.name;
+        memory.lastProduct = offeringDisplayName(newProduct);
 
         return res.json({
           reply: `🔄 Got it! I've updated your order:
@@ -2161,7 +2222,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
       // ✅ UPDATE QUANTITY ONLY
       if (newQty && memory.lastProduct) {
         const existingItem = memory.pendingOrder.items.find(
-          item => item.product === memory.lastProduct
+          item => item.product === memory.lastProduct || item.product === offeringDisplayName(findProductByName(memory.lastProduct, products) || {})
         );
 
         if (existingItem) {
@@ -2382,23 +2443,19 @@ RULES:
 
     const { intent, product, quantity, items, reply } = aiData;
 
-    const productFromAi = product && validProductNames.includes(product.toLowerCase())
-      ? products.find(p => p.name.toLowerCase() === product.toLowerCase())
-      : null;
+    const productFromAi = product ? findProductByName(product, products) : null;
     const mentionedProduct = productFromAi || productFromMessage;
 
     if (mentionedProduct) {
-      memory.lastProduct = mentionedProduct.name;
+      memory.lastProduct = offeringDisplayName(mentionedProduct);
     }
 
     if (Array.isArray(items) && items.length > 0) {
       const lastAiItem = items[items.length - 1];
-      const lastAiProduct = lastAiItem.product && products.find(
-        p => p.name.toLowerCase() === lastAiItem.product.toLowerCase()
-      );
+      const lastAiProduct = lastAiItem.product ? findProductByName(lastAiItem.product, products) : null;
 
       if (lastAiProduct) {
-        memory.lastProduct = lastAiProduct.name;
+        memory.lastProduct = offeringDisplayName(lastAiProduct);
       }
     }
 
@@ -2452,7 +2509,7 @@ RULES:
           action: "order",
           keyword: ambiguousProductChoice.keyword,
           quantity: quantity || extractQuantity(message),
-          choices: ambiguousProductChoice.matches.map(product => product.name),
+          choices: ambiguousProductChoice.matches.map(product => offeringDisplayName(product)),
         };
 
         const summary = orderItems.length > 0
@@ -2545,6 +2602,7 @@ async function startServer() {
   });
 
   console.log("MongoDB connected");
+  await ensureOfferingIndexes();
 
   const port = process.env.PORT || 3000;
 
