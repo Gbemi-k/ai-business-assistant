@@ -209,7 +209,7 @@
       align-items: end;
       display: grid;
       gap: 10px;
-      grid-template-columns: 1.2fr 1.3fr 0.8fr 0.7fr auto;
+      grid-template-columns: 0.8fr 1.2fr 1.3fr 0.8fr 0.7fr 0.9fr auto;
     }
 
     .actions {
@@ -459,31 +459,41 @@
       </section>
 
       <section class="panel">
-        <h2>Products <span class="pill" id="productCount">0 active</span></h2>
+        <h2>Products & Services <span class="pill" id="productCount">0 active</span></h2>
         <form id="productForm" class="toolbar">
-          <label>Product
-            <input id="productName" required placeholder="e.g. 75cl packs">
+          <label>Type
+            <select id="productType">
+              <option value="product">Product</option>
+              <option value="service">Service</option>
+            </select>
+          </label>
+          <label>Name
+            <input id="productName" required placeholder="e.g. 75cl packs or haircut">
           </label>
           <label>Aliases
-            <input id="productAliases" placeholder="e.g. water, small water">
+            <input id="productAliases" placeholder="e.g. water, haircut">
           </label>
           <label>Price
             <input id="productPrice" required min="0" step="0.01" type="number" placeholder="20">
           </label>
           <label>Stock
-            <input id="productStock" required min="0" step="1" type="number" placeholder="10">
+            <input id="productStock" min="0" step="1" type="number" placeholder="10">
+          </label>
+          <label>Duration
+            <input id="productDuration" placeholder="e.g. 45 mins">
           </label>
           <button type="submit">Add</button>
         </form>
-        <p class="empty">Tip: aliases are customer words for the same product, like "water", "small water", or "phone charger". Shared aliases will make the assistant ask a clarification.</p>
+        <p class="empty">Tip: use Product for inventory items and Service for bookings like haircut, cleaning, or photography. Services do not reduce stock.</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Type</th>
                 <th>Name</th>
                 <th>Aliases</th>
                 <th>Price</th>
-                <th>Stock</th>
+                <th>Stock / Duration</th>
                 <th>Updated</th>
                 <th>Actions</th>
               </tr>
@@ -544,10 +554,12 @@
       publicChatLink: document.querySelector("#publicChatLink"),
       refreshDashboard: document.querySelector("#refreshDashboard"),
       productForm: document.querySelector("#productForm"),
+      productType: document.querySelector("#productType"),
       productName: document.querySelector("#productName"),
       productAliases: document.querySelector("#productAliases"),
       productPrice: document.querySelector("#productPrice"),
       productStock: document.querySelector("#productStock"),
+      productDuration: document.querySelector("#productDuration"),
       productsTable: document.querySelector("#productsTable"),
       productCount: document.querySelector("#productCount"),
       ordersList: document.querySelector("#ordersList"),
@@ -644,10 +656,11 @@
       els.productCount.textContent = `${state.products.length} active`;
       els.productsTable.innerHTML = state.products.map(product => `
         <tr>
+          <td><span class="pill">${product.type || "product"}</span></td>
           <td><strong>${product.name}</strong></td>
           <td>${(product.aliases || []).join(", ") || "-"}</td>
           <td>${money(product.price)}</td>
-          <td>${product.stock_quantity}</td>
+          <td>${product.type === "service" ? (product.duration || "service") : product.stock_quantity}</td>
           <td>${new Date(product.updatedAt || product.createdAt).toLocaleString()}</td>
           <td class="actions-cell">
             <button class="secondary" type="button" data-edit="${product._id}">Edit</button>
@@ -657,7 +670,7 @@
       `).join("");
 
       if (state.products.length === 0) {
-        els.productsTable.innerHTML = `<tr><td colspan="6" class="empty">No active products yet.</td></tr>`;
+        els.productsTable.innerHTML = `<tr><td colspan="7" class="empty">No active products or services yet.</td></tr>`;
       }
     }
 
@@ -849,10 +862,13 @@
           method: "POST",
           body: JSON.stringify({
             businessId: activeBusinessId(),
+            type: els.productType.value,
             name: els.productName.value.trim(),
             aliases: els.productAliases.value,
             price: Number(els.productPrice.value),
-            stock_quantity: Number(els.productStock.value),
+            stock_quantity: Number(els.productStock.value || 0),
+            duration: els.productDuration.value.trim(),
+            requires_booking_time: els.productType.value === "service",
           }),
         });
         els.productForm.reset();
@@ -868,15 +884,26 @@
 
       if (editId) {
         const product = state.products.find(item => item._id === editId);
+        const type = prompt("Type: product or service", product.type || "product");
+        if (type === null) return;
         const aliases = prompt("Aliases, separated by commas", (product.aliases || []).join(", "));
         if (aliases === null) return;
         const price = prompt("New price", product.price);
         if (price === null) return;
         const stock = prompt("New stock", product.stock_quantity);
         if (stock === null) return;
+        const duration = prompt("Duration for services, optional", product.duration || "");
+        if (duration === null) return;
         await api(`/products/${editId}`, {
           method: "PUT",
-          body: JSON.stringify({ aliases, price: Number(price), stock_quantity: Number(stock) }),
+          body: JSON.stringify({
+            type,
+            aliases,
+            price: Number(price),
+            stock_quantity: Number(stock || 0),
+            duration,
+            requires_booking_time: type === "service",
+          }),
         });
         await loadProducts();
       }

@@ -159,10 +159,13 @@ function requireMatchingBusiness(req, res, businessId) {
 const productSchema = new mongoose.Schema(
   {
     businessId: { type: String, required: true, index: true },
+    type: { type: String, enum: ["product", "service"], default: "product", index: true },
     name: { type: String, required: true, trim: true },
     aliases: { type: [String], default: [] },
     price: { type: Number, required: true, min: 0 },
     stock_quantity: { type: Number, default: 0, min: 0 },
+    duration: { type: String, default: "", trim: true },
+    requires_booking_time: { type: Boolean, default: false },
     active: { type: Boolean, default: true },
   },
   { timestamps: true }
@@ -175,10 +178,12 @@ const Product = mongoose.model("Product", productSchema);
 const orderItemSchema = new mongoose.Schema(
   {
     product_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "Product" },
+    type: { type: String, enum: ["product", "service"], default: "product" },
     product: { type: String, required: true },
     quantity: { type: Number, required: true },
     unit_price: { type: Number, required: true },
     total_price: { type: Number, required: true },
+    duration: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -441,9 +446,35 @@ function formatMoney(amount, currency = "$") {
   })}`;
 }
 
+function isServiceOffering(product) {
+  return product?.type === "service";
+}
+
+function normalizedOfferingType(type) {
+  return type === "service" ? "service" : "product";
+}
+
+function orderQuantityForOffering(product, quantity) {
+  const numericQuantity = Number(quantity);
+
+  if (Number.isInteger(numericQuantity) && numericQuantity > 0) {
+    return numericQuantity;
+  }
+
+  return isServiceOffering(product) ? 1 : null;
+}
+
 function formatProductCatalog(products, currency = "$") {
   return products
-    .map(product => `- ${product.name}: ${formatMoney(product.price, currency)} (${product.stock_quantity} in stock)`)
+    .map(product => {
+      if (isServiceOffering(product)) {
+        const duration = product.duration ? `, ${product.duration}` : "";
+        const booking = product.requires_booking_time ? ", booking time needed" : "";
+        return `- ${product.name}: ${formatMoney(product.price, currency)}${duration}${booking}`;
+      }
+
+      return `- ${product.name}: ${formatMoney(product.price, currency)} (${product.stock_quantity} in stock)`;
+    })
     .join("\n");
 }
 
@@ -592,16 +623,19 @@ function extractOrderItems(message, products) {
         "i"
       );
       const quantityMatch = normalizedMessage.match(quantityPattern);
-      const quantity = quantityMatch
+      const parsedQuantity = quantityMatch
         ? extractQuantity(quantityMatch[0])
         : extractQuantityWithoutProductTerms(normalizedMessage, product);
+      const quantity = orderQuantityForOffering(product, parsedQuantity);
 
       return {
         product_id: product._id,
+        type: normalizedOfferingType(product.type),
         product: product.name,
-        quantity: quantity || null,
+        quantity,
         unit_price: product.price,
         total_price: quantity ? product.price * quantity : null,
+        duration: product.duration || "",
       };
     })
     .filter(Boolean);
@@ -625,16 +659,16 @@ function normalizeOrderItems(aiItems, fallbackProduct, fallbackQuantity, message
         return null;
       }
 
-      const quantity = Number(item.quantity);
+      const quantity = orderQuantityForOffering(selectedProduct, item.quantity);
 
       return {
         product_id: selectedProduct._id,
+        type: normalizedOfferingType(selectedProduct.type),
         product: selectedProduct.name,
-        quantity: Number.isInteger(quantity) && quantity > 0 ? quantity : null,
+        quantity,
         unit_price: selectedProduct.price,
-        total_price: Number.isInteger(quantity) && quantity > 0
-          ? selectedProduct.price * quantity
-          : null,
+        total_price: quantity ? selectedProduct.price * quantity : null,
+        duration: selectedProduct.duration || "",
       };
     })
     .filter(Boolean);
@@ -703,10 +737,12 @@ function addOrUpdateOrderItem(order, product, quantity) {
   } else {
     order.items.push({
       product_id: product._id,
+      type: normalizedOfferingType(product.type),
       product: product.name,
       quantity,
       unit_price: product.price,
       total_price: quantity * product.price,
+      duration: product.duration || "",
     });
   }
 
@@ -729,6 +765,10 @@ async function checkStockAvailability(items, businessId) {
         product: null,
         reply: `${item.product} is no longer available.`,
       };
+    }
+
+    if (isServiceOffering(product)) {
+      continue;
     }
 
     if (item.quantity > product.stock_quantity) {
@@ -783,7 +823,7 @@ function removeZeroStockPendingItems(memory, products) {
   for (const item of [...memory.pendingOrder.items]) {
     const product = products.find(candidate => candidate.name === item.product);
 
-    if (!product || product.stock_quantity <= 0) {
+    if (!product || (!isServiceOffering(product) && product.stock_quantity <= 0)) {
       removeOrderItem(memory.pendingOrder, item.product);
       removedItems.push(item.product);
     }
@@ -801,6 +841,10 @@ async function reduceStock(items, businessId) {
   const reducedItems = [];
 
   for (const item of items) {
+    if (item.type === "service") {
+      continue;
+    }
+
     const result = await Product.updateOne(
       {
         _id: item.product_id,
@@ -825,6 +869,10 @@ async function reduceStock(items, businessId) {
 
 async function restoreStock(items, businessId) {
   for (const item of items) {
+    if (item.type === "service") {
+      continue;
+    }
+
     await Product.updateOne(
       { _id: item.product_id, businessId },
       { $inc: { stock_quantity: item.quantity } }
@@ -1136,7 +1184,7 @@ async function loadPublicBusiness(req, res, next) {
 
 app.post("/products", requireAuth, async (req, res) => {
   try {
-    const { name, price, stock_quantity, aliases } = req.body;
+    const { name, price, stock_quantity, aliases, type, duration, requires_booking_time } = req.body;
     const businessId = req.businessId;
 
     if (!requireMatchingBusiness(req, res, req.body.businessId || businessId)) {
@@ -1158,9 +1206,10 @@ app.post("/products", requireAuth, async (req, res) => {
     }
 
     const normalizedName = name.toLowerCase().trim();
+    const offeringType = normalizedOfferingType(type);
     const numericStock = stock_quantity === undefined ? null : Number(stock_quantity);
 
-    if (numericStock !== null && (!Number.isInteger(numericStock) || numericStock < 0)) {
+    if (offeringType === "product" && numericStock !== null && (!Number.isInteger(numericStock) || numericStock < 0)) {
       return res.status(400).json({
         error: "stock_quantity must be a valid whole number.",
       });
@@ -1168,13 +1217,18 @@ app.post("/products", requireAuth, async (req, res) => {
 
     const update = {
       businessId,
+      type: offeringType,
       name: normalizedName,
       aliases: normalizeAliases(aliases),
       price: numericPrice,
+      duration: duration || "",
+      requires_booking_time: Boolean(requires_booking_time),
       active: true,
     };
 
-    if (numericStock !== null) {
+    if (offeringType === "service") {
+      update.stock_quantity = 0;
+    } else if (numericStock !== null) {
       update.stock_quantity = numericStock;
     }
 
@@ -1212,7 +1266,7 @@ app.get("/products/:businessId", requireAuth, async (req, res) => {
 // 🚀 MAIN ENDPOINT
 app.put("/products/:id", requireAuth, async (req, res) => {
   try {
-    const { name, price, stock_quantity, aliases, active } = req.body;
+    const { name, price, stock_quantity, aliases, active, type, duration, requires_booking_time } = req.body;
     const update = {};
     const existingProduct = await Product.findById(req.params.id).lean();
 
@@ -1230,6 +1284,10 @@ app.put("/products/:id", requireAuth, async (req, res) => {
 
     if (aliases !== undefined) {
       update.aliases = normalizeAliases(aliases);
+    }
+
+    if (type !== undefined) {
+      update.type = normalizedOfferingType(type);
     }
 
     if (price !== undefined) {
@@ -1250,6 +1308,18 @@ app.put("/products/:id", requireAuth, async (req, res) => {
       }
 
       update.stock_quantity = numericStock;
+    }
+
+    if (duration !== undefined) {
+      update.duration = String(duration || "").trim();
+    }
+
+    if (requires_booking_time !== undefined) {
+      update.requires_booking_time = Boolean(requires_booking_time);
+    }
+
+    if (update.type === "service") {
+      update.stock_quantity = 0;
     }
 
     if (active !== undefined) {
@@ -1466,10 +1536,13 @@ async function chatHandler(req, res) {
     removeZeroStockPendingItems(memory, products);
 
     const productsForPrompt = products.map(product => ({
+      type: normalizedOfferingType(product.type),
       name: product.name,
       aliases: product.aliases || [],
       price: product.price,
       stock_quantity: product.stock_quantity,
+      duration: product.duration || "",
+      requires_booking_time: Boolean(product.requires_booking_time),
     }));
 
     const pendingOrderReadyToConfirm = memory.pendingOrder?.items?.length > 0 &&
