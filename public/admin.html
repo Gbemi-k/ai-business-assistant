@@ -251,6 +251,42 @@
       color: var(--danger);
     }
 
+    .setup-list {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .setup-list li {
+      align-items: center;
+      background: #eef5ee;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: flex;
+      gap: 9px;
+      list-style: none;
+      padding: 10px 12px;
+    }
+
+    .setup-list li.done {
+      background: #f8faf6;
+      color: var(--muted);
+    }
+
+    .setup-check {
+      align-items: center;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--brand-dark);
+      display: inline-flex;
+      font-weight: 900;
+      height: 24px;
+      justify-content: center;
+      width: 24px;
+    }
+
     .table-wrap {
       overflow-x: auto;
     }
@@ -454,8 +490,14 @@
         <p id="sessionInfo">No business loaded.</p>
         <div class="actions">
           <a class="button-link" id="publicChatLink" href="#" target="_blank" rel="noopener">Open customer link</a>
+          <button type="button" class="secondary" id="copyPublicChatLink">Copy customer link</button>
           <button type="button" class="secondary" id="refreshDashboard">Refresh dashboard</button>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2>First-time setup</h2>
+        <ul class="setup-list" id="setupChecklist"></ul>
       </section>
 
       <section class="panel">
@@ -471,7 +513,7 @@
             <input id="productName" required placeholder="e.g. 75cl packs or haircut">
           </label>
           <label>Aliases
-            <input id="productAliases" placeholder="e.g. water, haircut">
+            <input id="productAliases" placeholder="Other names customers may type">
           </label>
           <label>Price
             <input id="productPrice" required min="0" step="0.01" type="number" placeholder="20">
@@ -484,7 +526,7 @@
           </label>
           <button type="submit">Add</button>
         </form>
-        <p class="empty">Tip: use Product for inventory items and Service for bookings like haircut, cleaning, or photography. Services do not reduce stock.</p>
+        <p class="empty">Tip: aliases are simple words customers may use instead of the exact name. Example: for "vanilla cake", aliases can be "vanilla, cake"; for "home cleaning", aliases can be "cleaning, house cleaning".</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -552,7 +594,9 @@
       businessStatus: document.querySelector("#businessStatus"),
       sessionInfo: document.querySelector("#sessionInfo"),
       publicChatLink: document.querySelector("#publicChatLink"),
+      copyPublicChatLink: document.querySelector("#copyPublicChatLink"),
       refreshDashboard: document.querySelector("#refreshDashboard"),
+      setupChecklist: document.querySelector("#setupChecklist"),
       productForm: document.querySelector("#productForm"),
       productType: document.querySelector("#productType"),
       productName: document.querySelector("#productName"),
@@ -663,6 +707,32 @@
       els.aiPersonality.value = business.ai_personality || "";
       els.sessionInfo.textContent = `${business.name} (${business.businessId})`;
       els.publicChatLink.href = `/b/${encodeURIComponent(business.businessId)}`;
+      renderSetupChecklist();
+    }
+
+    function publicChatUrl() {
+      return new URL(`/b/${encodeURIComponent(activeBusinessId())}`, window.location.origin).href;
+    }
+
+    function renderSetupChecklist() {
+      const hasProfile = Boolean(state.business?.name && state.business?.contact_info);
+      const hasOfferings = state.products.length > 0;
+      const hasAliases = state.products.some(product => (product.aliases || []).length > 0);
+      const hasOrders = state.orders.length > 0;
+      const steps = [
+        { done: hasProfile, text: "Complete your business profile and contact info." },
+        { done: hasOfferings, text: "Add your first product or service." },
+        { done: hasAliases, text: "Add simple aliases customers may type." },
+        { done: state.businessId, text: "Open or copy your customer ordering link." },
+        { done: hasOrders, text: "Place one test order from the customer link." },
+      ];
+
+      els.setupChecklist.innerHTML = steps.map(step => `
+        <li class="${step.done ? "done" : ""}">
+          <span class="setup-check">${step.done ? "✓" : "○"}</span>
+          <span>${step.text}</span>
+        </li>
+      `).join("");
     }
 
     function renderProducts() {
@@ -683,7 +753,7 @@
       `).join("");
 
       if (state.products.length === 0) {
-        els.productsTable.innerHTML = `<tr><td colspan="7" class="empty">No active products or services yet.</td></tr>`;
+        els.productsTable.innerHTML = `<tr><td colspan="7" class="empty">No active products or services yet. Add one above. Example product: vanilla cake, stock 10. Example service: home cleaning, duration 2 hours.</td></tr>`;
       }
     }
 
@@ -789,6 +859,7 @@
       const { products } = await api(`/products/${businessId}`);
       state.products = products;
       renderProducts();
+      renderSetupChecklist();
     }
 
     async function loadOrders() {
@@ -796,6 +867,7 @@
       const { orders } = await api(`/orders/${businessId}`);
       state.orders = orders;
       renderOrders();
+      renderSetupChecklist();
     }
 
     els.businessForm.addEventListener("submit", async event => {
@@ -870,6 +942,14 @@
     els.logout.addEventListener("click", () => logout());
     els.refreshDashboard.addEventListener("click", loadBusiness);
     els.productType.addEventListener("change", syncOfferingForm);
+    els.copyPublicChatLink.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(publicChatUrl());
+        setStatus(els.businessStatus, "Customer link copied. You can paste it on WhatsApp, Instagram, or send it to a customer.", "good");
+      } catch (error) {
+        setStatus(els.businessStatus, `Copy failed. Your customer link is: ${publicChatUrl()}`, "bad");
+      }
+    });
 
     els.productForm.addEventListener("submit", async event => {
       event.preventDefault();
