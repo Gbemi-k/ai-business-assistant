@@ -476,10 +476,10 @@
           <label>Price
             <input id="productPrice" required min="0" step="0.01" type="number" placeholder="20">
           </label>
-          <label>Stock
+          <label id="stockField">Stock
             <input id="productStock" min="0" step="1" type="number" placeholder="10">
           </label>
-          <label>Duration
+          <label id="durationField">Duration
             <input id="productDuration" placeholder="e.g. 45 mins">
           </label>
           <button type="submit">Add</button>
@@ -558,7 +558,9 @@
       productName: document.querySelector("#productName"),
       productAliases: document.querySelector("#productAliases"),
       productPrice: document.querySelector("#productPrice"),
+      stockField: document.querySelector("#stockField"),
       productStock: document.querySelector("#productStock"),
+      durationField: document.querySelector("#durationField"),
       productDuration: document.querySelector("#productDuration"),
       productsTable: document.querySelector("#productsTable"),
       productCount: document.querySelector("#productCount"),
@@ -569,6 +571,17 @@
 
     els.businessId.value = state.businessId;
     els.orderFilter.value = state.orderFilter;
+
+    function syncOfferingForm() {
+      const isService = els.productType.value === "service";
+      els.stockField.classList.toggle("hidden", isService);
+      els.durationField.classList.toggle("hidden", !isService);
+      els.productStock.required = !isService;
+      els.productStock.value = isService ? "" : els.productStock.value;
+      els.productDuration.value = isService ? els.productDuration.value : "";
+      els.productName.placeholder = isService ? "e.g. haircut or home cleaning" : "e.g. 75cl packs";
+      els.productAliases.placeholder = isService ? "e.g. cleaning, haircut" : "e.g. water, small water";
+    }
 
     function currency() {
       return state.business?.currency || els.currency.value || "$";
@@ -854,6 +867,7 @@
 
     els.logout.addEventListener("click", () => logout());
     els.refreshDashboard.addEventListener("click", loadBusiness);
+    els.productType.addEventListener("change", syncOfferingForm);
 
     els.productForm.addEventListener("submit", async event => {
       event.preventDefault();
@@ -944,6 +958,8 @@
     } else {
       showAuth();
     }
+
+    syncOfferingForm();
   </script>
 </body>
 </html>
