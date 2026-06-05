@@ -193,6 +193,8 @@ const customerSchema = new mongoose.Schema(
     name: { type: String, default: "", trim: true },
     phone: { type: String, default: "", trim: true },
     address: { type: String, default: "", trim: true },
+    preferred_date: { type: String, default: "", trim: true },
+    preferred_time: { type: String, default: "", trim: true },
     note: { type: String, default: "", trim: true },
   },
   { _id: false }
@@ -483,6 +485,8 @@ function sanitizeCustomerInfo(customer = {}) {
     name: String(customer.name || "").trim().slice(0, 120),
     phone: String(customer.phone || "").trim().slice(0, 80),
     address: String(customer.address || "").trim().slice(0, 300),
+    preferred_date: String(customer.preferred_date || "").trim().slice(0, 80),
+    preferred_time: String(customer.preferred_time || "").trim().slice(0, 80),
     note: String(customer.note || "").trim().slice(0, 300),
   };
 }

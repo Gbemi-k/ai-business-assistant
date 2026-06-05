@@ -714,6 +714,8 @@
           customer.name ? `Name: ${escapeHtml(customer.name)}` : "",
           customer.phone ? `Phone: ${escapeHtml(customer.phone)}` : "",
           customer.address ? `Address: ${escapeHtml(customer.address)}` : "",
+          customer.preferred_date ? `Preferred date: ${escapeHtml(customer.preferred_date)}` : "",
+          customer.preferred_time ? `Preferred time: ${escapeHtml(customer.preferred_time)}` : "",
           customer.note ? `Note: ${escapeHtml(customer.note)}` : "",
         ].filter(Boolean);
 

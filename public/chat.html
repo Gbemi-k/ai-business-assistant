@@ -262,7 +262,7 @@
       <div class="details-head">
         <div>
           <h2>Your details</h2>
-          <p>Saved on this device and sent with your order.</p>
+          <p>Saved on this device and sent with your order or booking request.</p>
         </div>
         <small>Name and phone are needed before checkout.</small>
       </div>
@@ -274,11 +274,19 @@
           <input id="customerPhone" autocomplete="tel" placeholder="080...">
         </label>
       </div>
-      <label>Delivery address or pickup note
-        <textarea id="customerAddress" placeholder="Where should the business deliver, or will you pick up?"></textarea>
+      <label>Delivery address / service location
+        <textarea id="customerAddress" placeholder="Delivery address, pickup note, or where the service should happen"></textarea>
       </label>
+      <div class="details-grid">
+        <label>Preferred date
+          <input id="preferredDate" placeholder="e.g. Friday or 12 June">
+        </label>
+        <label>Preferred time
+          <input id="preferredTime" placeholder="e.g. 10 AM">
+        </label>
+      </div>
       <label>Extra note
-        <input id="customerNote" placeholder="Optional, e.g. delivery time or special request">
+        <input id="customerNote" placeholder="Optional, e.g. service details or special request">
       </label>
       <div class="quick-actions">
         <button type="button" data-message="what do you have available?">What is available?</button>
@@ -315,6 +323,8 @@
       customerName: document.querySelector("#customerName"),
       customerPhone: document.querySelector("#customerPhone"),
       customerAddress: document.querySelector("#customerAddress"),
+      preferredDate: document.querySelector("#preferredDate"),
+      preferredTime: document.querySelector("#preferredTime"),
       customerNote: document.querySelector("#customerNote"),
       messages: document.querySelector("#messages"),
       emptyState: document.querySelector("#emptyState"),
@@ -328,6 +338,8 @@
       els.customerName.value = saved.name || "";
       els.customerPhone.value = saved.phone || "";
       els.customerAddress.value = saved.address || "";
+      els.preferredDate.value = saved.preferred_date || "";
+      els.preferredTime.value = saved.preferred_time || "";
       els.customerNote.value = saved.note || "";
     }
 
@@ -336,6 +348,8 @@
         name: els.customerName.value.trim(),
         phone: els.customerPhone.value.trim(),
         address: els.customerAddress.value.trim(),
+        preferred_date: els.preferredDate.value.trim(),
+        preferred_time: els.preferredTime.value.trim(),
         note: els.customerNote.value.trim(),
       };
     }
@@ -416,7 +430,7 @@
       });
     });
 
-    [els.customerName, els.customerPhone, els.customerAddress, els.customerNote].forEach(input => {
+    [els.customerName, els.customerPhone, els.customerAddress, els.preferredDate, els.preferredTime, els.customerNote].forEach(input => {
       input.addEventListener("input", saveCustomerDetails);
     });
 
