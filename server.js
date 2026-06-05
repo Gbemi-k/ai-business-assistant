@@ -261,6 +261,22 @@ function isCatalogConfirmationFollowup(message) {
   return /\b(are you sure|is that all|only that|that's all|that is all|is this all)\b/i.test(message);
 }
 
+function buildBusinessChatFollowup(reply, products) {
+  const normalizedReply = (reply || "").toLowerCase();
+  const mentionedProducts = products.filter(product =>
+    normalizedReply.includes(product.name.toLowerCase())
+  );
+  const offersMoreInfo = /\b(want|would you like|like to|interested|know more|tell me more|more about)\b/i.test(reply || "");
+
+  if (mentionedProducts.length > 0 && offersMoreInfo) {
+    return {
+      action: "show_catalog",
+    };
+  }
+
+  return null;
+}
+
 function isGreetingOnly(message) {
   return /^(hi|hello|hey|sup|yo|good morning|good afternoon|good evening)\b[!.?\s]*$/i.test(message.trim());
 }
@@ -1644,6 +1660,17 @@ async function chatHandler(req, res) {
       });
     }
 
+    if (!memory.pendingOrder && memory.awaitingBusinessFollowup?.action === "show_catalog" && isYes(message)) {
+      memory.awaitingBusinessFollowup = null;
+      memory.lastCatalog = products.map(product => product.name);
+      memory.lastIntent = "browse_products";
+
+      return res.json({
+        reply: `Of course. Here is what we currently have:\n\n${formatProductCatalog(products, currency)}`,
+        order: null,
+      });
+    }
+
     try {
       aiIntent = await getAiIntent({ message, business, productsForPrompt, memory });
     } catch (error) {
@@ -1656,10 +1683,12 @@ async function chatHandler(req, res) {
       : null;
 
     if (aiIntent?.intent === "greeting" || aiIntent?.intent === "business_chat") {
-      memory.lastIntent = "chat";
+      const reply = aiIntent.reply || `Hey! How can I help you with ${business.name} today?`;
+      memory.awaitingBusinessFollowup = buildBusinessChatFollowup(reply, products);
+      memory.lastIntent = memory.awaitingBusinessFollowup ? "business_chat_offer" : "chat";
 
       return res.json({
-        reply: aiIntent.reply || `Hey! How can I help you with ${business.name} today?`,
+        reply,
         order: null,
       });
     }
