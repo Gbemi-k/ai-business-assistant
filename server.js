@@ -253,6 +253,14 @@ function isBrowseRequest(message) {
     /\b(menu|catalog|products|items)\b/.test(message);
 }
 
+function isBroadCatalogRequest(message) {
+  return isBrowseRequest(message) && !/\b(specific|particular|only)\b/i.test(message);
+}
+
+function isCatalogConfirmationFollowup(message) {
+  return /\b(are you sure|is that all|only that|that's all|that is all|is this all)\b/i.test(message);
+}
+
 function isGreetingOnly(message) {
   return /^(hi|hello|hey|sup|yo|good morning|good afternoon|good evening)\b[!.?\s]*$/i.test(message.trim());
 }
@@ -1627,6 +1635,15 @@ async function chatHandler(req, res) {
     const productCategory = findProductCategory(message, products);
     let aiIntent = null;
 
+    if (!memory.pendingOrder && memory.lastCatalog?.length && isCatalogConfirmationFollowup(message)) {
+      const catalogProducts = products.filter(product => memory.lastCatalog.includes(product.name));
+
+      return res.json({
+        reply: `Yes. This is the current list I have for ${business.name}:\n\n${formatProductCatalog(catalogProducts.length ? catalogProducts : products, currency)}\n\nIf something is missing, the business owner may need to add it in the admin dashboard.`,
+        order: null,
+      });
+    }
+
     try {
       aiIntent = await getAiIntent({ message, business, productsForPrompt, memory });
     } catch (error) {
@@ -1648,8 +1665,10 @@ async function chatHandler(req, res) {
     }
 
     if (aiIntent?.intent === "browse_products" || aiIntent?.intent === "ask_stock") {
-      const matchingProducts = (aiProduct ? [aiProduct] : productCategory?.matches) || products;
-      const pendingNote = memory.pendingOrder
+      const matchingProducts = isBroadCatalogRequest(message)
+        ? products
+        : ((aiProduct ? [aiProduct] : productCategory?.matches) || products);
+      const pendingNote = memory.pendingOrder?.items?.length
         ? `\n\nYour pending order is still here:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}`
         : "";
 
@@ -1657,6 +1676,7 @@ async function chatHandler(req, res) {
         memory.lastProduct = matchingProducts[0].name;
       }
 
+      memory.lastCatalog = matchingProducts.map(product => product.name);
       memory.lastIntent = aiIntent.intent;
 
       return res.json({
@@ -1813,7 +1833,9 @@ async function chatHandler(req, res) {
     }
 
     if (!memory.pendingOrder && isBrowseRequest(message)) {
-      const matchingProducts = productCategory?.matches?.length > 0
+      const matchingProducts = isBroadCatalogRequest(message)
+        ? products
+        : productCategory?.matches?.length > 0
         ? productCategory.matches
         : products;
 
@@ -1821,6 +1843,7 @@ async function chatHandler(req, res) {
         memory.lastCategory = productCategory.keyword;
       }
 
+      memory.lastCatalog = matchingProducts.map(product => product.name);
       memory.lastIntent = "browse";
 
       return res.json({
