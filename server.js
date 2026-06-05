@@ -266,7 +266,7 @@ function isNo(message) {
 }
 
 function isOrderRequest(message) {
-  return /\b(i want|i need|i would like|i will like|i'll like|buy|order|get|take|purchase)\b/.test(message);
+  return /\b(i want|i need|i would like|i will like|i'll like|buy|order|get|take|purchase|go for|choose|pick)\b/.test(message);
 }
 
 // ✅ EXTRACT QUANTITY
@@ -458,10 +458,11 @@ function productNameRegex(name) {
 
 function findProductByName(name, products) {
   const normalizedName = name.toLowerCase().trim();
-
-  return products.find(product =>
+  const matches = products.filter(product =>
     getProductSearchTerms(product).includes(normalizedName)
   );
+
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function getProductKeywords(product) {
@@ -479,8 +480,35 @@ function hasWord(message, word) {
   return new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(message);
 }
 
-function formatProductChoices(products) {
-  const names = products.map(product => offeringDisplayName(product));
+function getOptionKeywords(product) {
+  return normalizeOfferingOption(product?.option)
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !["with", "and", "the", "for"].includes(word));
+}
+
+function resolveUniqueOptionProduct(message, products) {
+  const matches = products.filter(product =>
+    getOptionKeywords(product).some(keyword => hasWord(message, keyword))
+  );
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function formatProductChoices(products, currency = "$") {
+  const displayNames = products.map(product => offeringDisplayName(product));
+  const duplicateNames = new Set(
+    displayNames.filter((name, index) => displayNames.indexOf(name) !== index)
+  );
+  const names = products.map(product => {
+    const displayName = offeringDisplayName(product);
+
+    if (!duplicateNames.has(displayName)) {
+      return displayName;
+    }
+
+    const duration = product.duration ? `, ${product.duration}` : "";
+    return `${displayName} (${formatMoney(product.price, currency)}${duration})`;
+  });
 
   if (names.length <= 2) {
     return names.join(" or ");
@@ -590,17 +618,42 @@ function findAmbiguousProductChoice(message, products) {
 
   const ambiguousMatch = [...keywordMatches.entries()]
     .map(([keyword, matches]) => ({ keyword, matches }))
-    .filter(match => !match.matches.some(product => productNameRegex(product.name).test(message)))
+    .filter(match => {
+      if (resolveUniqueOptionProduct(message, match.matches)) {
+        return false;
+      }
+
+      const exactMatches = match.matches.filter(product =>
+        productNameRegex(offeringDisplayName(product)).test(message) ||
+        (product.option && productNameRegex(product.option).test(message))
+      );
+
+      if (exactMatches.length !== 1) {
+        return true;
+      }
+
+      const sameNameMatches = match.matches.filter(product => product.name === exactMatches[0].name);
+      return sameNameMatches.length > 1;
+    })
     .find(match => match.matches.length > 1);
 
   return ambiguousMatch || null;
 }
 
 function resolveProductChoice(message, choices) {
-  const directMatch = choices.find(product => productNameRegex(product.name).test(message));
+  const optionMatch = resolveUniqueOptionProduct(message, choices);
 
-  if (directMatch) {
-    return directMatch;
+  if (optionMatch) {
+    return optionMatch;
+  }
+
+  const exactMatches = choices.filter(product =>
+    productNameRegex(offeringDisplayName(product)).test(message) ||
+    (product.option && productNameRegex(product.option).test(message))
+  );
+
+  if (exactMatches.length === 1) {
+    return exactMatches[0];
   }
 
   const matchedChoices = choices.filter(product =>
@@ -1277,6 +1330,17 @@ app.post("/products", requireAuth, async (req, res) => {
     const normalizedOption = normalizeOfferingOption(option);
     const offeringType = normalizedOfferingType(type);
     const numericStock = stock_quantity === undefined ? null : Number(stock_quantity);
+    const duplicateNameExists = await Product.exists({
+      businessId,
+      name: normalizedName,
+      active: true,
+    });
+
+    if (duplicateNameExists && !normalizedOption) {
+      return res.status(400).json({
+        error: "This name already exists. Add an Option / Package, like 'short', 'medium', or 'long', so customers can choose correctly.",
+      });
+    }
 
     if (offeringType === "product" && numericStock !== null && (!Number.isInteger(numericStock) || numericStock < 0)) {
       return res.status(400).json({
@@ -1392,6 +1456,21 @@ app.put("/products/:id", requireAuth, async (req, res) => {
 
     if (requires_booking_time !== undefined) {
       update.requires_booking_time = Boolean(requires_booking_time);
+    }
+
+    const nextName = update.name ?? existingProduct.name;
+    const nextOption = update.option ?? normalizeOfferingOption(existingProduct.option);
+    const duplicateNameExists = await Product.exists({
+      _id: { $ne: existingProduct._id },
+      businessId: existingProduct.businessId,
+      name: nextName,
+      active: true,
+    });
+
+    if (duplicateNameExists && !nextOption) {
+      return res.status(400).json({
+        error: "This name is shared by more than one offering. Add an Option / Package so customers can choose correctly.",
+      });
     }
 
     if (update.type === "service") {
@@ -1914,7 +1993,7 @@ async function chatHandler(req, res) {
       }
 
       return res.json({
-        reply: `Sure. Which ${memory.awaitingProductChoice.keyword || "product"} would you like: ${formatProductChoices(pendingChoices)}?`,
+        reply: `Sure. Which ${memory.awaitingProductChoice.keyword || "product"} would you like: ${formatProductChoices(pendingChoices, currency)}?`,
         order: null,
       });
     }
@@ -1965,7 +2044,7 @@ async function chatHandler(req, res) {
         };
 
         return res.json({
-          reply: `Sure. Which ${category.keyword} would you like: ${formatProductChoices(category.matches)}?`,
+          reply: `Sure. Which ${category.keyword} would you like: ${formatProductChoices(category.matches, currency)}?`,
           order: null,
         });
       }
@@ -2011,7 +2090,7 @@ async function chatHandler(req, res) {
         : "";
 
       return res.json({
-        reply: `Sure. Which ${ambiguousProductChoice.keyword} would you like: ${formatProductChoices(ambiguousProductChoice.matches)}?${summary}`,
+        reply: `Sure. Which ${ambiguousProductChoice.keyword} would you like: ${formatProductChoices(ambiguousProductChoice.matches, currency)}?${summary}`,
         order: null,
       });
     }
@@ -2120,20 +2199,20 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 
         if (isGreetingOnly(message)) {
           return res.json({
-            reply: `Hey! I'm still here with you. When you're ready, which ${memory.awaitingProductChoice.keyword} would you like: ${formatProductChoices(pendingChoices)}?`,
+            reply: `Hey! I'm still here with you. When you're ready, which ${memory.awaitingProductChoice.keyword} would you like: ${formatProductChoices(pendingChoices, currency)}?`,
             order: null,
           });
         }
 
         if (isBrowseRequest(message)) {
           return res.json({
-            reply: `We have:\n\n${formatProductCatalog(products, currency)}\n\nWhen you're ready, which ${memory.awaitingProductChoice.keyword} would you like: ${formatProductChoices(pendingChoices)}?`,
+            reply: `We have:\n\n${formatProductCatalog(products, currency)}\n\nWhen you're ready, which ${memory.awaitingProductChoice.keyword} would you like: ${formatProductChoices(pendingChoices, currency)}?`,
             order: null,
           });
         }
 
         return res.json({
-          reply: `Sure. Which ${memory.awaitingProductChoice.keyword} would you like: ${formatProductChoices(pendingChoices)}?`,
+          reply: `Sure. Which ${memory.awaitingProductChoice.keyword} would you like: ${formatProductChoices(pendingChoices, currency)}?`,
           order: null,
         });
       }
@@ -2147,7 +2226,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         };
 
         return res.json({
-          reply: `Sure. Which ${pendingAmbiguousChoice.keyword} would you like: ${formatProductChoices(pendingAmbiguousChoice.matches)}?`,
+          reply: `Sure. Which ${pendingAmbiguousChoice.keyword} would you like: ${formatProductChoices(pendingAmbiguousChoice.matches, currency)}?`,
           order: null,
         });
       }
@@ -2517,7 +2596,7 @@ RULES:
           : "";
 
         return res.json({
-          reply: `Sure. Which ${ambiguousProductChoice.keyword} would you like: ${formatProductChoices(ambiguousProductChoice.matches)}?${summary}`,
+          reply: `Sure. Which ${ambiguousProductChoice.keyword} would you like: ${formatProductChoices(ambiguousProductChoice.matches, currency)}?${summary}`,
           order: null,
         });
       }
