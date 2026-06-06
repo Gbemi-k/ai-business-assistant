@@ -46,6 +46,7 @@ const businessSchema = new mongoose.Schema(
     tone: { type: String, default: "friendly", trim: true },
     description: { type: String, default: "", trim: true },
     contact_info: { type: String, default: "", trim: true },
+    notification_email: { type: String, default: "", lowercase: true, trim: true },
     ai_personality: { type: String, default: "", trim: true },
   },
   { timestamps: true }
@@ -818,6 +819,116 @@ function formatOrderList(orders, currency = "$") {
     .join("\n");
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatCustomerForNotification(customer = {}) {
+  const lines = [
+    customer.name ? `Name: ${customer.name}` : "",
+    customer.phone ? `Phone/WhatsApp: ${customer.phone}` : "",
+    customer.address ? `Address/location: ${customer.address}` : "",
+    customer.preferred_date ? `Preferred date: ${customer.preferred_date}` : "",
+    customer.preferred_time ? `Preferred time: ${customer.preferred_time}` : "",
+    customer.note ? `Note: ${customer.note}` : "",
+  ].filter(Boolean);
+
+  return lines.length ? lines.join("\n") : "No customer details provided.";
+}
+
+function formatOrderNotificationText({ business, order, currency, dashboardUrl }) {
+  return `New order for ${business.name}
+
+Order ID: ${order.order_id}
+Status: ${order.status}
+
+Customer:
+${formatCustomerForNotification(order.customer)}
+
+Items:
+${formatOrderItems(order.items, currency)}
+
+Total: ${formatMoney(order.total_price, currency)}
+
+Dashboard:
+${dashboardUrl}`;
+}
+
+function formatOrderNotificationHtml({ business, order, currency, dashboardUrl }) {
+  const customerLines = formatCustomerForNotification(order.customer)
+    .split("\n")
+    .map(line => `<li>${escapeHtml(line)}</li>`)
+    .join("");
+  const itemLines = order.items
+    .map(item => `<li>${escapeHtml(item.product)}: ${item.quantity} x ${escapeHtml(formatMoney(item.unit_price, currency))} = ${escapeHtml(formatMoney(item.total_price, currency))}</li>`)
+    .join("");
+
+  return `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#142018">
+      <h2>New order for ${escapeHtml(business.name)}</h2>
+      <p><strong>Order ID:</strong> ${escapeHtml(order.order_id)}</p>
+      <p><strong>Status:</strong> ${escapeHtml(order.status)}</p>
+      <h3>Customer</h3>
+      <ul>${customerLines}</ul>
+      <h3>Items</h3>
+      <ul>${itemLines}</ul>
+      <p><strong>Total:</strong> ${escapeHtml(formatMoney(order.total_price, currency))}</p>
+      <p><a href="${escapeHtml(dashboardUrl)}">Open dashboard</a></p>
+    </div>
+  `;
+}
+
+async function sendOrderNotificationEmail({ business, order, currency, req }) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL;
+  const to = business.notification_email || business.email;
+
+  if (!resendApiKey || !from || !to) {
+    console.log("Order email notification skipped: missing RESEND_API_KEY, EMAIL_FROM, or recipient email.");
+    return { sent: false, skipped: true };
+  }
+
+  const origin = `${req.protocol}://${req.get("host")}`;
+  const dashboardUrl = `${origin}/admin`;
+  const payload = {
+    from,
+    to,
+    subject: `New order ${order.order_id} for ${business.name}`,
+    text: formatOrderNotificationText({ business, order, currency, dashboardUrl }),
+    html: formatOrderNotificationHtml({ business, order, currency, dashboardUrl }),
+  };
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Resend email failed: ${response.status} ${body}`);
+  }
+
+  return { sent: true };
+}
+
+async function notifyBusinessOfOrder({ business, order, currency, req }) {
+  try {
+    return await sendOrderNotificationEmail({ business, order, currency, req });
+  } catch (error) {
+    console.error("Order email notification failed:", error.message);
+    return { sent: false, error: error.message };
+  }
+}
+
 async function generateOrderId(businessId) {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const prefix = `SH-${today}-`;
@@ -1156,7 +1267,7 @@ Return JSON only:
 
 app.post("/businesses", async (req, res) => {
   try {
-    const { businessId, name, email, password, currency, tone, description, contact_info, ai_personality } = req.body;
+    const { businessId, name, email, password, currency, tone, description, contact_info, notification_email, ai_personality } = req.body;
 
     if (!businessId || !name || !email) {
       return res.status(400).json({ error: "businessId, name, and email are required." });
@@ -1173,6 +1284,7 @@ app.post("/businesses", async (req, res) => {
       tone: tone || "friendly",
       description: description || "",
       contact_info: contact_info || "",
+      notification_email: notification_email ? String(notification_email).toLowerCase().trim() : normalizedEmail,
       ai_personality: ai_personality || "",
     };
 
@@ -1764,6 +1876,7 @@ async function chatHandler(req, res) {
       memory.awaitingProductChoice = null;
       memory.lastCompletedOrder = orderData;
       memory.lastIntent = "order_completed";
+      notifyBusinessOfOrder({ business, order: orderData, currency, req });
 
       return res.json({
         reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
@@ -2386,6 +2499,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         memory.awaitingProductChoice = null;
         memory.lastCompletedOrder = orderData;
         memory.lastIntent = "order_completed";
+        notifyBusinessOfOrder({ business, order: orderData, currency, req });
 
         return res.json({
           reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,

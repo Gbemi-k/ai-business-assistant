@@ -447,6 +447,9 @@
           <label>Owner email
             <input id="email" required type="email" placeholder="owner@example.com">
           </label>
+          <label>Order notification email
+            <input id="notificationEmail" type="email" placeholder="orders@example.com">
+          </label>
           <label>Password
             <input id="password" type="password" placeholder="At least 6 characters">
           </label>
@@ -588,6 +591,7 @@
       businessId: document.querySelector("#businessId"),
       businessName: document.querySelector("#businessName"),
       email: document.querySelector("#email"),
+      notificationEmail: document.querySelector("#notificationEmail"),
       password: document.querySelector("#password"),
       currency: document.querySelector("#currency"),
       tone: document.querySelector("#tone"),
@@ -706,6 +710,7 @@
       els.businessId.value = business.businessId;
       els.businessName.value = business.name || "";
       els.email.value = business.email || "";
+      els.notificationEmail.value = business.notification_email || business.email || "";
       els.currency.value = business.currency || "$";
       els.tone.value = business.tone || "friendly";
       els.contactInfo.value = business.contact_info || "";
@@ -884,6 +889,7 @@
           businessId: activeBusinessId(),
           name: els.businessName.value.trim(),
           email: els.email.value.trim(),
+          notification_email: els.notificationEmail.value.trim(),
           currency: els.currency.value,
           tone: els.tone.value,
           description: els.businessDescription.value.trim(),
