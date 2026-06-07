@@ -351,10 +351,10 @@
           <input id="customerPhone" autocomplete="tel" placeholder="080...">
         </label>
       </div>
-      <label>Delivery address / service location
+      <label id="addressLabel"><span id="addressLabelText">Delivery address / service location</span>
         <textarea id="customerAddress" placeholder="Delivery address, pickup note, or where the service should happen"></textarea>
       </label>
-      <div class="details-grid">
+      <div class="details-grid" id="bookingFields">
         <label>Preferred date
           <input id="preferredDate" placeholder="e.g. Friday or 12 June">
         </label>
@@ -362,7 +362,7 @@
           <input id="preferredTime" placeholder="e.g. 10 AM">
         </label>
       </div>
-      <label>Extra note
+      <label id="noteLabel"><span id="noteLabelText">Extra note</span>
         <input id="customerNote" placeholder="Optional, e.g. service details or special request">
       </label>
       <div class="quick-actions">
@@ -388,6 +388,8 @@
     const detailsKey = `customerDetails:${businessId}`;
     const state = {
       business: null,
+      products: [],
+      offeringMode: "mixed",
       customerId: localStorage.getItem(sessionKey) || crypto.randomUUID(),
     };
 
@@ -402,9 +404,14 @@
       copyShareMessage: document.querySelector("#copyShareMessage"),
       customerName: document.querySelector("#customerName"),
       customerPhone: document.querySelector("#customerPhone"),
+      addressLabel: document.querySelector("#addressLabel"),
+      addressLabelText: document.querySelector("#addressLabelText"),
       customerAddress: document.querySelector("#customerAddress"),
+      bookingFields: document.querySelector("#bookingFields"),
       preferredDate: document.querySelector("#preferredDate"),
       preferredTime: document.querySelector("#preferredTime"),
+      noteLabel: document.querySelector("#noteLabel"),
+      noteLabelText: document.querySelector("#noteLabelText"),
       customerNote: document.querySelector("#customerNote"),
       messages: document.querySelector("#messages"),
       emptyState: document.querySelector("#emptyState"),
@@ -438,6 +445,49 @@
       localStorage.setItem(detailsKey, JSON.stringify(customerDetails()));
     }
 
+    function detectOfferingMode(products) {
+      const hasProducts = products.some(product => product.type !== "service");
+      const hasServices = products.some(product => product.type === "service");
+
+      if (hasServices && !hasProducts) {
+        return "service";
+      }
+
+      if (hasProducts && !hasServices) {
+        return "product";
+      }
+
+      return "mixed";
+    }
+
+    function applyDetailsMode() {
+      const mode = state.offeringMode;
+
+      if (mode === "product") {
+        els.addressLabelText.textContent = "Delivery address / pickup note";
+        els.customerAddress.placeholder = "Delivery address or pickup note";
+        els.bookingFields.classList.add("hidden");
+        els.noteLabelText.textContent = "Extra note";
+        els.customerNote.placeholder = "Optional, e.g. delivery instruction or special request";
+        return;
+      }
+
+      if (mode === "service") {
+        els.addressLabelText.textContent = "Service location";
+        els.customerAddress.placeholder = "Where should the service happen? Leave blank if you will visit the business.";
+        els.bookingFields.classList.remove("hidden");
+        els.noteLabelText.textContent = "Service note";
+        els.customerNote.placeholder = "Optional, e.g. style, size, design, or special request";
+        return;
+      }
+
+      els.addressLabelText.textContent = "Delivery address / service location";
+      els.customerAddress.placeholder = "Delivery address, pickup note, or where the service should happen";
+      els.bookingFields.classList.remove("hidden");
+      els.noteLabelText.textContent = "Extra note";
+      els.customerNote.placeholder = "Optional, e.g. service details or special request";
+    }
+
     function addMessage(role, text) {
       els.emptyState?.remove();
       const message = document.createElement("div");
@@ -448,20 +498,31 @@
     }
 
     async function loadBusiness() {
-      const response = await fetch(`/public/businesses/${encodeURIComponent(businessId)}`);
-      const body = await response.json().catch(() => ({}));
+      const [businessResponse, productsResponse] = await Promise.all([
+        fetch(`/public/businesses/${encodeURIComponent(businessId)}`),
+        fetch(`/public/products/${encodeURIComponent(businessId)}`),
+      ]);
+      const body = await businessResponse.json().catch(() => ({}));
+      const productsBody = await productsResponse.json().catch(() => ({}));
 
-      if (!response.ok) {
+      if (!businessResponse.ok) {
         throw new Error(body.error || "Business not found.");
       }
 
+      if (!productsResponse.ok) {
+        throw new Error(productsBody.error || "Could not load business offerings.");
+      }
+
       state.business = body.business;
+      state.products = productsBody.products || [];
+      state.offeringMode = detectOfferingMode(state.products);
       document.title = `${state.business.name} Chat`;
       els.businessName.textContent = state.business.name;
       els.businessDescription.textContent = state.business.description || "Chat with us to ask questions or place an order.";
       els.businessBadge.textContent = state.business.contact_info || "AI ordering";
       els.trustBusinessName.textContent = state.business.name;
       els.businessContact.textContent = state.business.contact_info || "No contact details provided yet.";
+      applyDetailsMode();
     }
 
     async function copyShareMessage() {

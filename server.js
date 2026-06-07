@@ -1392,6 +1392,33 @@ app.get("/public/businesses/:businessId", async (req, res) => {
   }
 });
 
+app.get("/public/products/:businessId", async (req, res) => {
+  try {
+    const products = await Product.find({
+      businessId: req.params.businessId,
+      active: true,
+    })
+      .select("type name option price stock_quantity duration requires_booking_time")
+      .sort({ type: 1, name: 1, option: 1 })
+      .lean();
+
+    return res.json({
+      products: products.map(product => ({
+        type: normalizedOfferingType(product.type),
+        name: product.name,
+        option: product.option || "",
+        display_name: offeringDisplayName(product),
+        price: product.price,
+        stock_quantity: product.stock_quantity,
+        duration: product.duration || "",
+        requires_booking_time: Boolean(product.requires_booking_time),
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Could not fetch public products." });
+  }
+});
+
 async function loadPublicBusiness(req, res, next) {
   try {
     const business = await Business.findOne({ businessId: req.params.businessId }).lean();
