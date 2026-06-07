@@ -243,6 +243,30 @@
       color: var(--muted);
     }
 
+    .order-bell {
+      align-items: center;
+      background: #fff8e6;
+      border: 1px solid rgba(185, 130, 30, 0.3);
+      border-radius: 14px;
+      color: #5a4215;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+    }
+
+    .order-bell strong {
+      color: #3d2a08;
+    }
+
+    .order-bell.empty {
+      background: #eef5ee;
+      border-color: var(--line);
+      color: var(--muted);
+    }
+
     .status {
       border-left: 4px solid var(--accent);
       color: var(--muted);
@@ -571,6 +595,10 @@
           <button type="button" class="secondary" id="enableBrowserNotifications">Enable browser notifications</button>
           <small id="orderSoundStatus">Dashboard will check for new orders while open.</small>
         </div>
+        <div class="order-bell" id="orderBell">
+          <strong id="newOrderBadge">No new orders</strong>
+          <button type="button" class="secondary" id="markOrdersSeen">Mark seen</button>
+        </div>
         <label>Show orders
           <select id="orderFilter">
             <option value="active">Active orders</option>
@@ -593,6 +621,7 @@
       orders: [],
       orderFilter: localStorage.getItem("adminOrderFilter") || "active",
       knownOrderIds: new Set(),
+      seenOrderIds: new Set(),
       orderPollingStarted: false,
       orderSoundEnabled: false,
       browserNotificationsEnabled: false,
@@ -644,6 +673,9 @@
       enableOrderSound: document.querySelector("#enableOrderSound"),
       enableBrowserNotifications: document.querySelector("#enableBrowserNotifications"),
       orderSoundStatus: document.querySelector("#orderSoundStatus"),
+      orderBell: document.querySelector("#orderBell"),
+      newOrderBadge: document.querySelector("#newOrderBadge"),
+      markOrdersSeen: document.querySelector("#markOrdersSeen"),
       orderFilter: document.querySelector("#orderFilter"),
     };
 
@@ -692,6 +724,45 @@
 
     function isActiveOrder(order) {
       return order.status !== "delivered";
+    }
+
+    function seenOrdersKey() {
+      return `seenOrderIds:${activeBusinessId()}`;
+    }
+
+    function loadSeenOrderIds() {
+      try {
+        state.seenOrderIds = new Set(JSON.parse(localStorage.getItem(seenOrdersKey()) || "[]"));
+      } catch {
+        state.seenOrderIds = new Set();
+      }
+    }
+
+    function saveSeenOrderIds() {
+      localStorage.setItem(seenOrdersKey(), JSON.stringify([...state.seenOrderIds]));
+    }
+
+    function unseenActiveOrders() {
+      return state.orders.filter(order =>
+        isActiveOrder(order) && !state.seenOrderIds.has(order.order_id)
+      );
+    }
+
+    function updateNewOrderBadge() {
+      const count = unseenActiveOrders().length;
+      els.newOrderBadge.textContent = count === 0
+        ? "No new orders"
+        : `${count} new order${count === 1 ? "" : "s"}`;
+      els.markOrdersSeen.disabled = count === 0;
+      els.orderBell.classList.toggle("empty", count === 0);
+    }
+
+    function markOrdersSeen() {
+      state.orders
+        .filter(isActiveOrder)
+        .forEach(order => state.seenOrderIds.add(order.order_id));
+      saveSeenOrderIds();
+      updateNewOrderBadge();
     }
 
     function playOrderSound() {
@@ -868,6 +939,7 @@
       state.business = business;
       state.businessId = business.businessId;
       localStorage.setItem("adminBusinessId", state.businessId);
+      loadSeenOrderIds();
       els.businessId.value = business.businessId;
       els.businessName.value = business.name || "";
       els.email.value = business.email || "";
@@ -1022,6 +1094,7 @@
       state.business = null;
       state.products = [];
       state.orders = [];
+      state.seenOrderIds = new Set();
       localStorage.removeItem("adminToken");
       localStorage.removeItem("adminBusinessId");
       renderProducts();
@@ -1043,6 +1116,7 @@
       watchForNewOrders(orders, { silent: silent || !notify });
       state.orders = orders;
       renderOrders();
+      updateNewOrderBadge();
       renderSetupChecklist();
     }
 
@@ -1207,6 +1281,7 @@
         els.orderSoundStatus.textContent = `Could not enable notifications: ${error.message}`;
       });
     });
+    els.markOrdersSeen.addEventListener("click", markOrdersSeen);
 
     els.orderFilter.addEventListener("change", event => {
       state.orderFilter = event.target.value;
@@ -1225,6 +1300,8 @@
           status: event.target.value,
         }),
       });
+      state.seenOrderIds.add(orderId);
+      saveSeenOrderIds();
       await loadOrders({ silent: true });
     });
 
