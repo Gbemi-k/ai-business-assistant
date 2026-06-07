@@ -15,6 +15,7 @@
       --cream: #f6f1df;
       --customer: #e6f3ec;
       --assistant: #102117;
+      --gold: #b9821e;
       --shadow: 0 22px 70px rgba(28, 36, 31, 0.16);
       font-family: "Aptos", "Segoe UI", sans-serif;
     }
@@ -80,6 +81,35 @@
       max-width: 560px;
     }
 
+    .trust-strip {
+      align-items: center;
+      background: rgba(255, 250, 235, 0.94);
+      border: 1px solid rgba(185, 130, 30, 0.24);
+      border-radius: 18px;
+      color: #5a4215;
+      display: flex;
+      font-size: 0.95rem;
+      gap: 10px;
+      justify-content: space-between;
+      padding: 12px 14px;
+    }
+
+    .trust-strip strong {
+      color: #3d2a08;
+    }
+
+    .trust-mark {
+      align-items: center;
+      background: rgba(185, 130, 30, 0.14);
+      border-radius: 999px;
+      color: #744f0d;
+      display: inline-flex;
+      font-weight: 900;
+      height: 28px;
+      justify-content: center;
+      min-width: 28px;
+    }
+
     .pill {
       align-self: start;
       background: #e8efe7;
@@ -132,6 +162,34 @@
 
     .details-card small {
       color: var(--muted);
+    }
+
+    .business-card {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr auto;
+    }
+
+    .business-contact {
+      background: #eef5ee;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      color: var(--brand-dark);
+      padding: 12px 14px;
+    }
+
+    .business-contact strong {
+      display: block;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    .share-note {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin: 0;
     }
 
     .messages {
@@ -242,6 +300,12 @@
         grid-template-columns: 1fr;
       }
 
+      .trust-strip,
+      .business-card {
+        align-items: stretch;
+        display: grid;
+      }
+
       .message {
         max-width: 92%;
       }
@@ -256,6 +320,19 @@
         <p id="businessDescription">Preparing this business assistant.</p>
       </div>
       <span class="pill" id="businessBadge">AI ordering</span>
+    </section>
+
+    <section class="trust-strip" id="trustStrip">
+      <span><span class="trust-mark">✓</span> <strong>Official ordering page</strong> for <span id="trustBusinessName">this business</span>. Your order goes directly to the business owner.</span>
+    </section>
+
+    <section class="details-card business-card">
+      <div class="business-contact">
+        <strong>Business contact</strong>
+        <span id="businessContact">Loading contact details...</span>
+      </div>
+      <button type="button" class="secondary" id="copyShareMessage">Copy share message</button>
+      <p class="share-note">If this link came from the business owner’s WhatsApp, Instagram, or bio, you are in the right place.</p>
     </section>
 
     <section class="details-card">
@@ -320,6 +397,9 @@
       businessName: document.querySelector("#businessName"),
       businessDescription: document.querySelector("#businessDescription"),
       businessBadge: document.querySelector("#businessBadge"),
+      trustBusinessName: document.querySelector("#trustBusinessName"),
+      businessContact: document.querySelector("#businessContact"),
+      copyShareMessage: document.querySelector("#copyShareMessage"),
       customerName: document.querySelector("#customerName"),
       customerPhone: document.querySelector("#customerPhone"),
       customerAddress: document.querySelector("#customerAddress"),
@@ -380,6 +460,17 @@
       els.businessName.textContent = state.business.name;
       els.businessDescription.textContent = state.business.description || "Chat with us to ask questions or place an order.";
       els.businessBadge.textContent = state.business.contact_info || "AI ordering";
+      els.trustBusinessName.textContent = state.business.name;
+      els.businessContact.textContent = state.business.contact_info || "No contact details provided yet.";
+    }
+
+    async function copyShareMessage() {
+      const text = `Hi, this is ${state.business?.name || "our business"}'s official AI ordering page.\n\nYou can use it to view what is available, ask questions, and place your order:\n${location.href}`;
+      await navigator.clipboard.writeText(text);
+      els.copyShareMessage.textContent = "Copied";
+      setTimeout(() => {
+        els.copyShareMessage.textContent = "Copy share message";
+      }, 1600);
     }
 
     async function sendMessage(message) {
@@ -429,6 +520,8 @@
         els.chatForm.requestSubmit();
       });
     });
+
+    els.copyShareMessage.addEventListener("click", copyShareMessage);
 
     [els.customerName, els.customerPhone, els.customerAddress, els.preferredDate, els.preferredTime, els.customerNote].forEach(input => {
       input.addEventListener("input", saveCustomerDetails);
