@@ -231,6 +231,18 @@
       margin: 0;
     }
 
+    .notify-row {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .notify-row small {
+      color: var(--muted);
+    }
+
     .status {
       border-left: 4px solid var(--accent);
       color: var(--muted);
@@ -554,6 +566,10 @@
 
       <section class="panel">
         <h2>Orders <button type="button" class="secondary" id="refreshOrders">Refresh</button></h2>
+        <div class="notify-row">
+          <button type="button" class="secondary" id="enableOrderSound">Enable order sound</button>
+          <small id="orderSoundStatus">Dashboard will check for new orders while open.</small>
+        </div>
         <label>Show orders
           <select id="orderFilter">
             <option value="active">Active orders</option>
@@ -575,6 +591,10 @@
       products: [],
       orders: [],
       orderFilter: localStorage.getItem("adminOrderFilter") || "active",
+      knownOrderIds: new Set(),
+      orderPollingStarted: false,
+      orderSoundEnabled: false,
+      audioContext: null,
     };
 
     const els = {
@@ -619,6 +639,8 @@
       productCount: document.querySelector("#productCount"),
       ordersList: document.querySelector("#ordersList"),
       refreshOrders: document.querySelector("#refreshOrders"),
+      enableOrderSound: document.querySelector("#enableOrderSound"),
+      orderSoundStatus: document.querySelector("#orderSoundStatus"),
       orderFilter: document.querySelector("#orderFilter"),
     };
 
@@ -663,6 +685,88 @@
     function setStatus(element, message, type = "") {
       element.textContent = message;
       element.className = `status ${type}`;
+    }
+
+    function isActiveOrder(order) {
+      return order.status !== "delivered";
+    }
+
+    function playOrderSound() {
+      if (!state.orderSoundEnabled || !state.audioContext) {
+        return;
+      }
+
+      const context = state.audioContext;
+      const now = context.currentTime;
+      const notes = [
+        { frequency: 740, start: 0, duration: 0.14 },
+        { frequency: 980, start: 0.16, duration: 0.18 },
+      ];
+
+      notes.forEach(note => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(note.frequency, now + note.start);
+        gain.gain.setValueAtTime(0.001, now + note.start);
+        gain.gain.exponentialRampToValueAtTime(0.16, now + note.start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + note.start + note.duration);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(now + note.start);
+        oscillator.stop(now + note.start + note.duration + 0.03);
+      });
+    }
+
+    async function enableOrderSound() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+
+      if (!AudioContext) {
+        els.orderSoundStatus.textContent = "This browser does not support order sounds.";
+        return;
+      }
+
+      state.audioContext = state.audioContext || new AudioContext();
+
+      if (state.audioContext.state === "suspended") {
+        await state.audioContext.resume();
+      }
+
+      state.orderSoundEnabled = true;
+      els.enableOrderSound.textContent = "Order sound enabled";
+      els.orderSoundStatus.textContent = "Sound is on. Keep this dashboard tab open for alerts.";
+      playOrderSound();
+    }
+
+    function watchForNewOrders(nextOrders, { silent = false } = {}) {
+      const activeOrderIds = nextOrders
+        .filter(isActiveOrder)
+        .map(order => order.order_id);
+      const newOrderIds = activeOrderIds.filter(orderId => !state.knownOrderIds.has(orderId));
+
+      if (!silent && newOrderIds.length > 0) {
+        playOrderSound();
+        els.orderSoundStatus.textContent = `${newOrderIds.length} new order${newOrderIds.length === 1 ? "" : "s"} received.`;
+      }
+
+      state.knownOrderIds = new Set(activeOrderIds);
+    }
+
+    function startOrderPolling() {
+      if (state.orderPollingStarted) {
+        return;
+      }
+
+      state.orderPollingStarted = true;
+      setInterval(() => {
+        if (!state.token || !state.businessId) {
+          return;
+        }
+
+        loadOrders({ notify: true }).catch(error => {
+          els.orderSoundStatus.textContent = `Order check failed: ${error.message}`;
+        });
+      }, 12000);
     }
 
     function showAuth(message = "Use your business email and password to continue.", type = "") {
@@ -829,7 +933,8 @@
         fillBusinessForm(business);
         showDashboard();
         setStatus(els.businessStatus, `Loaded ${business.name}.`, "good");
-        await Promise.all([loadProducts(), loadOrders()]);
+        await Promise.all([loadProducts(), loadOrders({ silent: true })]);
+        startOrderPolling();
       } catch (error) {
         logout(`${error.message}\nPlease log in again.`, "bad");
       }
@@ -850,7 +955,8 @@
       els.authPassword.value = "";
       showDashboard();
       setStatus(els.businessStatus, `Logged in as ${result.business.name}.`, "good");
-      await Promise.all([loadProducts(), loadOrders()]);
+      await Promise.all([loadProducts(), loadOrders({ silent: true })]);
+      startOrderPolling();
     }
 
     function logout(message = "Logged out. Use your business email and password to continue.", type = "") {
@@ -874,9 +980,10 @@
       renderSetupChecklist();
     }
 
-    async function loadOrders() {
+    async function loadOrders({ notify = false, silent = false } = {}) {
       const businessId = activeBusinessId();
       const { orders } = await api(`/orders/${businessId}`);
+      watchForNewOrders(orders, { silent: silent || !notify });
       state.orders = orders;
       renderOrders();
       renderSetupChecklist();
@@ -913,7 +1020,8 @@
         fillBusinessForm(business);
         els.password.value = "";
         setStatus(els.businessStatus, `Saved ${business.name}.`, "good");
-        await Promise.all([loadProducts(), loadOrders()]);
+        await Promise.all([loadProducts(), loadOrders({ silent: true })]);
+        startOrderPolling();
       } catch (error) {
         setStatus(els.businessStatus, error.message, "bad");
       }
@@ -938,7 +1046,8 @@
         els.authPassword.value = "";
         showDashboard();
         setStatus(els.businessStatus, `Registered ${result.business.name}.`, "good");
-        await Promise.all([loadProducts(), loadOrders()]);
+        await Promise.all([loadProducts(), loadOrders({ silent: true })]);
+        startOrderPolling();
       } catch (error) {
         setStatus(els.authStatus, error.message, "bad");
       }
@@ -1030,7 +1139,12 @@
       }
     });
 
-    els.refreshOrders.addEventListener("click", loadOrders);
+    els.refreshOrders.addEventListener("click", () => loadOrders({ notify: true }));
+    els.enableOrderSound.addEventListener("click", () => {
+      enableOrderSound().catch(error => {
+        els.orderSoundStatus.textContent = `Could not enable sound: ${error.message}`;
+      });
+    });
 
     els.orderFilter.addEventListener("change", event => {
       state.orderFilter = event.target.value;
@@ -1049,7 +1163,7 @@
           status: event.target.value,
         }),
       });
-      await loadOrders();
+      await loadOrders({ silent: true });
     });
 
     if (state.token && state.businessId) {
