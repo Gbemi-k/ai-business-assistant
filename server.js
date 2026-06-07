@@ -1946,6 +1946,58 @@ async function chatHandler(req, res) {
       });
     }
 
+    if (
+      !memory.pendingOrder &&
+      memory.lastCatalog?.length &&
+      productFromMessage &&
+      memory.lastCatalog.includes(offeringDisplayName(productFromMessage)) &&
+      !isBrowseRequest(message)
+    ) {
+      const quantity = orderQuantityForOffering(productFromMessage, extractQuantityWithoutProductTerms(message, productFromMessage));
+      memory.lastProduct = offeringDisplayName(productFromMessage);
+      memory.lastIntent = "order";
+
+      if (!quantity) {
+        memory.pendingOrder = {
+          items: [{
+            product_id: productFromMessage._id,
+            type: normalizedOfferingType(productFromMessage.type),
+            product: offeringDisplayName(productFromMessage),
+            quantity: null,
+            unit_price: productFromMessage.price,
+            total_price: null,
+            duration: productFromMessage.duration || "",
+          }],
+          total_price: 0,
+        };
+
+        return res.json({
+          reply: `Nice choice! 👌\n\nHow many ${offeringDisplayName(productFromMessage)} would you like?`,
+          order: null,
+        });
+      }
+
+      memory.pendingOrder = {
+        items: [],
+        total_price: 0,
+      };
+      addOrUpdateOrderItem(memory.pendingOrder, productFromMessage, quantity);
+      const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
+
+      if (!stockCheck.ok) {
+        memory.pendingOrder = null;
+        return res.status(stockCheck.status).json({
+          reply: stockCheck.reply,
+          order: null,
+        });
+      }
+
+      return res.json({
+        reply: `Great choice!\n\n🛒 Order Summary:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+        order: null,
+      });
+    }
+
     try {
       aiIntent = await getAiIntent({ message, business, productsForPrompt, memory });
     } catch (error) {
