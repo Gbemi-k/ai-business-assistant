@@ -568,6 +568,7 @@
         <h2>Orders <button type="button" class="secondary" id="refreshOrders">Refresh</button></h2>
         <div class="notify-row">
           <button type="button" class="secondary" id="enableOrderSound">Enable order sound</button>
+          <button type="button" class="secondary" id="enableBrowserNotifications">Enable browser notifications</button>
           <small id="orderSoundStatus">Dashboard will check for new orders while open.</small>
         </div>
         <label>Show orders
@@ -594,6 +595,7 @@
       knownOrderIds: new Set(),
       orderPollingStarted: false,
       orderSoundEnabled: false,
+      browserNotificationsEnabled: false,
       audioContext: null,
     };
 
@@ -640,6 +642,7 @@
       ordersList: document.querySelector("#ordersList"),
       refreshOrders: document.querySelector("#refreshOrders"),
       enableOrderSound: document.querySelector("#enableOrderSound"),
+      enableBrowserNotifications: document.querySelector("#enableBrowserNotifications"),
       orderSoundStatus: document.querySelector("#orderSoundStatus"),
       orderFilter: document.querySelector("#orderFilter"),
     };
@@ -738,6 +741,57 @@
       playOrderSound();
     }
 
+    function orderNotificationBody(order) {
+      const customer = order.customer?.name || "New customer";
+      const items = (order.items || [])
+        .map(item => `${item.quantity} x ${item.product}`)
+        .join(", ");
+
+      return `${customer}\n${items || "New order"}\nTotal: ${money(order.total_price)}`;
+    }
+
+    function showBrowserOrderNotification(order) {
+      if (!state.browserNotificationsEnabled || !("Notification" in window) || Notification.permission !== "granted") {
+        return;
+      }
+
+      const notification = new Notification(`New order ${order.order_id}`, {
+        body: orderNotificationBody(order),
+        tag: `order-${order.order_id}`,
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+    }
+
+    async function enableBrowserNotifications() {
+      if (!("Notification" in window)) {
+        els.orderSoundStatus.textContent = "This browser does not support notifications.";
+        return;
+      }
+
+      const permission = Notification.permission === "default"
+        ? await Notification.requestPermission()
+        : Notification.permission;
+
+      if (permission !== "granted") {
+        state.browserNotificationsEnabled = false;
+        els.orderSoundStatus.textContent = "Browser notifications are blocked. Allow them in your browser settings.";
+        return;
+      }
+
+      state.browserNotificationsEnabled = true;
+      els.enableBrowserNotifications.textContent = "Browser notifications enabled";
+      els.orderSoundStatus.textContent = "Browser notifications are on. Keep this dashboard tab open.";
+
+      new Notification("Order notifications enabled", {
+        body: "You will be notified when a new order arrives.",
+        tag: "order-notifications-enabled",
+      });
+    }
+
     function watchForNewOrders(nextOrders, { silent = false } = {}) {
       const activeOrderIds = nextOrders
         .filter(isActiveOrder)
@@ -746,6 +800,9 @@
 
       if (!silent && newOrderIds.length > 0) {
         playOrderSound();
+        nextOrders
+          .filter(order => newOrderIds.includes(order.order_id))
+          .forEach(showBrowserOrderNotification);
         els.orderSoundStatus.textContent = `${newOrderIds.length} new order${newOrderIds.length === 1 ? "" : "s"} received.`;
       }
 
@@ -1143,6 +1200,11 @@
     els.enableOrderSound.addEventListener("click", () => {
       enableOrderSound().catch(error => {
         els.orderSoundStatus.textContent = `Could not enable sound: ${error.message}`;
+      });
+    });
+    els.enableBrowserNotifications.addEventListener("click", () => {
+      enableBrowserNotifications().catch(error => {
+        els.orderSoundStatus.textContent = `Could not enable notifications: ${error.message}`;
       });
     });
 
