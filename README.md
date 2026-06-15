@@ -11,7 +11,7 @@ ChatOrder helps businesses take orders automatically through chat.
 
 ## Why It Is Useful
 
-Many small businesses sell through WhatsApp or Instagram and often:
+Many businesses sell through WhatsApp, Instagram, or online chat and often:
 
 - Miss messages
 - Reply late
