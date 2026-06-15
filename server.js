@@ -16,7 +16,7 @@ app.use(bodyParser.json());
 app.use(express.static("public"));
 
 app.get("/", (req, res) => {
-  res.redirect("/admin");
+  res.sendFile("index.html", { root: "public" });
 });
 
 app.get("/admin", (req, res) => {

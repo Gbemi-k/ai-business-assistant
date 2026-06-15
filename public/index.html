@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChatOrder - AI Ordering for Small Businesses</title>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #627067;
+      --brand: #1f6b4e;
+      --brand-dark: #123c2d;
+      --cream: #f7f0dd;
+      --gold: #c98923;
+      --panel: rgba(255, 255, 255, 0.9);
+      --line: rgba(23, 33, 27, 0.12);
+      --shadow: 0 28px 80px rgba(23, 33, 27, 0.15);
+      font-family: "Aptos", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      color: var(--ink);
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(201, 137, 35, 0.24), transparent 32rem),
+        radial-gradient(circle at bottom right, rgba(31, 107, 78, 0.2), transparent 34rem),
+        repeating-linear-gradient(90deg, rgba(23, 33, 27, 0.035) 0 1px, transparent 1px 78px),
+        var(--cream);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page {
+      margin: 0 auto;
+      max-width: 1120px;
+      padding: 24px;
+    }
+
+    .nav {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 46px;
+    }
+
+    .logo {
+      align-items: center;
+      display: inline-flex;
+      font-weight: 950;
+      gap: 10px;
+      letter-spacing: -0.03em;
+    }
+
+    .logo-mark {
+      align-items: center;
+      background: var(--brand);
+      border-radius: 14px;
+      color: white;
+      display: inline-flex;
+      height: 38px;
+      justify-content: center;
+      width: 38px;
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .button {
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      display: inline-flex;
+      font-weight: 850;
+      justify-content: center;
+      padding: 12px 17px;
+    }
+
+    .button.primary {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: white;
+    }
+
+    .hero {
+      align-items: center;
+      display: grid;
+      gap: 34px;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+    }
+
+    .eyebrow {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--brand-dark);
+      display: inline-flex;
+      font-size: 0.86rem;
+      font-weight: 850;
+      margin-bottom: 18px;
+      padding: 9px 13px;
+    }
+
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(3.1rem, 8vw, 6.7rem);
+      letter-spacing: -0.07em;
+      line-height: 0.86;
+      margin: 0;
+      max-width: 760px;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: 1.2rem;
+      line-height: 1.55;
+      margin: 24px 0;
+      max-width: 620px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .preview {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      transform: rotate(1deg);
+    }
+
+    .chat-card,
+    .dashboard-card,
+    .feature-card,
+    .step {
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+    }
+
+    .message {
+      border-radius: 18px;
+      line-height: 1.45;
+      margin: 10px 0;
+      padding: 12px 14px;
+    }
+
+    .message.customer {
+      background: #e8f3ed;
+      margin-left: 42px;
+    }
+
+    .message.ai {
+      background: #102117;
+      color: white;
+      margin-right: 28px;
+    }
+
+    .dashboard-card {
+      background: #fff8e8;
+    }
+
+    .order-line {
+      align-items: center;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .pill {
+      background: #e8efe7;
+      border-radius: 999px;
+      color: var(--brand-dark);
+      font-size: 0.78rem;
+      font-weight: 850;
+      padding: 6px 9px;
+    }
+
+    .section {
+      margin-top: 72px;
+    }
+
+    .section h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      letter-spacing: -0.05em;
+      margin: 0 0 18px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .feature-card strong,
+    .step strong {
+      display: block;
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p,
+    .step p {
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .cta {
+      align-items: center;
+      background: var(--brand-dark);
+      border-radius: 30px;
+      color: white;
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+      padding: 26px;
+    }
+
+    .cta p {
+      color: rgba(255, 255, 255, 0.78);
+      line-height: 1.5;
+      margin: 8px 0 0;
+    }
+
+    .cta .button {
+      background: white;
+      color: var(--brand-dark);
+      flex: 0 0 auto;
+    }
+
+    @media (max-width: 860px) {
+      .hero,
+      .grid,
+      .cta {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        display: grid;
+      }
+
+      .preview {
+        transform: none;
+      }
+
+      .nav {
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .nav,
+      .cta {
+        display: grid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <nav class="nav" aria-label="Main navigation">
+      <a class="logo" href="/">
+        <span class="logo-mark">C</span>
+        <span>ChatOrder</span>
+      </a>
+      <div class="nav-actions">
+        <a class="button" href="/admin">Business Login</a>
+        <a class="button primary" href="/admin">Get Started</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <span class="eyebrow">Built for small businesses selling on WhatsApp and Instagram</span>
+        <h1>Take orders automatically with AI.</h1>
+        <p class="lead">ChatOrder gives every business a simple chat link customers can use to ask questions, choose products or services, and place orders without waiting for manual replies.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="/admin">Create Business Account</a>
+          <a class="button" href="#how-it-works">See How It Works</a>
+        </div>
+      </div>
+
+      <aside class="preview" aria-label="ChatOrder preview">
+        <div class="chat-card">
+          <span class="pill">Customer chat link</span>
+          <div class="message customer">What cakes do you have?</div>
+          <div class="message ai">We have vanilla cake and red velvet cake. Which would you like?</div>
+          <div class="message customer">I want 2 red velvet cakes</div>
+        </div>
+        <div class="dashboard-card">
+          <span class="pill">Dashboard</span>
+          <div class="order-line">
+            <strong>New order received</strong>
+            <span>&#8358;40,000</span>
+          </div>
+          <div class="order-line">
+            <span>2 x red velvet cake</span>
+            <span class="pill">placed</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section" id="how-it-works">
+      <h2>How it works</h2>
+      <div class="grid">
+        <article class="step">
+          <strong>1. Add products or services</strong>
+          <p>Business owners add prices, stock, service details, and common names customers may type.</p>
+        </article>
+        <article class="step">
+          <strong>2. Share the chat link</strong>
+          <p>Customers open the business link from WhatsApp, Instagram bio, TikTok, or direct messages.</p>
+        </article>
+        <article class="step">
+          <strong>3. Receive orders instantly</strong>
+          <p>Orders appear in the dashboard with customer details, order status, sound alerts, and badges.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>What businesses get</h2>
+      <div class="grid">
+        <article class="feature-card">
+          <strong>AI customer assistant</strong>
+          <p>Answers business questions, lists available items, and guides customers through orders.</p>
+        </article>
+        <article class="feature-card">
+          <strong>Order dashboard</strong>
+          <p>Track active orders, delivered orders, customer details, and status updates in one place.</p>
+        </article>
+        <article class="feature-card">
+          <strong>Made for products and services</strong>
+          <p>Works for cakes, water, nails, cleaning, food, pharmacy items, and other small businesses.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section cta">
+      <div>
+        <h2>Ready to test ChatOrder?</h2>
+        <p>Create a business account, add your first product or service, and share your customer ordering link.</p>
+      </div>
+      <a class="button" href="/admin">Open Dashboard</a>
+    </section>
+  </main>
+</body>
+</html>
