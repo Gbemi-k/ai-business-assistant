@@ -29,12 +29,12 @@ ChatOrder helps by handling product questions, order collection, and dashboard t
 5. Orders appear in the business dashboard
 
 ## Screenshots
-<img width="1366" height="768" alt="Screenshot (266)" src="https://github.com/user-attachments/assets/cf64c551-a4a2-42b2-9359-e58236ae2a3d" />
-<img width="1366" height="768" alt="Screenshot (265)" src="https://github.com/user-attachments/assets/5a259ea6-5a97-4258-b2ea-1835ec2c15c9" />
-<img width="1366" height="768" alt="Screenshot (264)" src="https://github.com/user-attachments/assets/e2000c98-3f34-4973-adb4-5e6dc2f0d76f" />
-<img width="1366" height="768" alt="Screenshot (263)" src="https://github.com/user-attachments/assets/0335734c-b499-4de2-8059-6dddb6235293" />
-<img width="1366" height="768" alt="Screenshot (262)" src="https://github.com/user-attachments/assets/fbcc2d96-6d0f-40a1-8ffa-ce1593361932" />
-<img width="1366" height="768" alt="Screenshot (261)" src="https://github.com/user-attachments/assets/13e49930-a590-41e6-ac52-0e2f1c4d1032" />
+<img width="1299" height="645" alt="Screenshot (261)" src="https://github.com/user-attachments/assets/ab59bb29-79c7-405d-8004-df5fdfb77113" />
+<img width="1100" height="637" alt="Screenshot (262)" src="https://github.com/user-attachments/assets/5214a6c1-6beb-4c39-8693-879ee2adb10a" />
+<img width="1153" height="637" alt="Screenshot (263)" src="https://github.com/user-attachments/assets/8207f4f9-57c8-4ab2-a37e-1c6dfa9fb49e" />
+<img width="887" height="618" alt="Screenshot (264)" src="https://github.com/user-attachments/assets/a72881d4-ea39-4bf2-b32c-2c7ae74265c9" />
+<img width="819" height="652" alt="Screenshot (265)" src="https://github.com/user-attachments/assets/7fd9bab4-dea2-405b-ad6b-fae51c597476" />
+<img width="917" height="658" alt="Screenshot (266)" src="https://github.com/user-attachments/assets/3a0d0799-1be3-4088-9120-5fb089e76776" />
 
 
 
