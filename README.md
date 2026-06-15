@@ -67,4 +67,5 @@ Early MVP — currently testing with real businesses.
 
 If you want to try it:
 
-[Your email or WhatsApp]
+[08038045749]
+[kukoyigbemileke@gmail.com]
