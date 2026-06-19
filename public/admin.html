@@ -515,6 +515,27 @@
           <label>AI personality
             <textarea id="aiPersonality" placeholder="Helpful, concise, warm..."></textarea>
           </label>
+          <div class="grid two">
+            <label>Require deposit?
+              <select id="depositEnabled">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </label>
+            <label>Deposit percentage
+              <input id="depositPercentage" min="0" max="100" step="1" type="number" placeholder="40">
+            </label>
+          </div>
+          <label>Deposit applies to
+            <select id="depositAppliesTo">
+              <option value="services">Services only</option>
+              <option value="products">Products only</option>
+              <option value="both">Products and services</option>
+            </select>
+          </label>
+          <label>Payment instruction
+            <textarea id="paymentInstructions" placeholder="Example: Pay 40% to Opay 080... and send receipt on WhatsApp."></textarea>
+          </label>
           <div class="actions">
             <button type="submit">Save profile</button>
             <button type="button" class="secondary" id="logout">Logout</button>
@@ -649,6 +670,10 @@
       contactInfo: document.querySelector("#contactInfo"),
       businessDescription: document.querySelector("#businessDescription"),
       aiPersonality: document.querySelector("#aiPersonality"),
+      depositEnabled: document.querySelector("#depositEnabled"),
+      depositPercentage: document.querySelector("#depositPercentage"),
+      depositAppliesTo: document.querySelector("#depositAppliesTo"),
+      paymentInstructions: document.querySelector("#paymentInstructions"),
       logout: document.querySelector("#logout"),
       businessStatus: document.querySelector("#businessStatus"),
       sessionInfo: document.querySelector("#sessionInfo"),
@@ -949,6 +974,10 @@
       els.contactInfo.value = business.contact_info || "";
       els.businessDescription.value = business.description || "";
       els.aiPersonality.value = business.ai_personality || "";
+      els.depositEnabled.value = business.deposit_enabled ? "true" : "false";
+      els.depositPercentage.value = business.deposit_percentage ?? 40;
+      els.depositAppliesTo.value = business.deposit_applies_to || "services";
+      els.paymentInstructions.value = business.payment_instructions || "";
       els.sessionInfo.textContent = `${business.name} (${business.businessId})`;
       els.publicChatLink.href = `/b/${encodeURIComponent(business.businessId)}`;
       renderSetupChecklist();
@@ -1033,6 +1062,12 @@
           customer.preferred_time ? `Preferred time: ${escapeHtml(customer.preferred_time)}` : "",
           customer.note ? `Note: ${escapeHtml(customer.note)}` : "",
         ].filter(Boolean);
+        const paymentLines = order.deposit_enabled ? [
+          `Payment status: ${escapeHtml((order.payment_status || "pending_deposit").replaceAll("_", " "))}`,
+          `Deposit required: ${money(order.deposit_amount || 0)}`,
+          `Balance: ${money(order.balance_due || 0)}`,
+          order.payment_instructions ? `Instruction: ${escapeHtml(order.payment_instructions)}` : "",
+        ].filter(Boolean) : [];
 
         return `
         <article class="order">
@@ -1045,8 +1080,16 @@
                 `<option value="${status}" ${order.status === status ? "selected" : ""}>${status}</option>`
               ).join("")}
             </select>
+            ${order.deposit_enabled ? `
+              <select data-payment-status="${order.order_id}">
+                ${["pending_deposit", "deposit_paid"].map(status =>
+                  `<option value="${status}" ${(order.payment_status || "pending_deposit") === status ? "selected" : ""}>${status.replaceAll("_", " ")}</option>`
+                ).join("")}
+              </select>
+            ` : ""}
           </div>
           ${customerLines.length ? `<div class="customer-card"><small>Customer details</small>${customerLines.map(line => `<span>${line}</span>`).join("")}</div>` : ""}
+          ${paymentLines.length ? `<div class="customer-card"><small>Payment</small>${paymentLines.map(line => `<span>${line}</span>`).join("")}</div>` : ""}
           <pre>${order.items.map(item =>
             `${item.product}: ${item.quantity} x ${money(item.unit_price)} = ${money(item.total_price)}`
           ).join("\n")}</pre>
@@ -1132,6 +1175,10 @@
           tone: els.tone.value,
           description: els.businessDescription.value.trim(),
           contact_info: els.contactInfo.value.trim(),
+          deposit_enabled: els.depositEnabled.value === "true",
+          deposit_percentage: Number(els.depositPercentage.value || 0),
+          deposit_applies_to: els.depositAppliesTo.value,
+          payment_instructions: els.paymentInstructions.value.trim(),
           ai_personality: els.aiPersonality.value.trim(),
         };
 
@@ -1291,16 +1338,30 @@
 
     els.ordersList.addEventListener("change", async event => {
       const orderId = event.target.dataset.status;
-      if (!orderId) return;
+      const paymentOrderId = event.target.dataset.paymentStatus;
 
-      await api(`/orders/${orderId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          businessId: activeBusinessId(),
-          status: event.target.value,
-        }),
-      });
-      state.seenOrderIds.add(orderId);
+      if (orderId) {
+        await api(`/orders/${orderId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            businessId: activeBusinessId(),
+            status: event.target.value,
+          }),
+        });
+        state.seenOrderIds.add(orderId);
+      }
+
+      if (paymentOrderId) {
+        await api(`/orders/${paymentOrderId}/payment-status`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            businessId: activeBusinessId(),
+            payment_status: event.target.value,
+          }),
+        });
+        state.seenOrderIds.add(paymentOrderId);
+      }
+
       saveSeenOrderIds();
       await loadOrders({ silent: true });
     });

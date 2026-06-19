@@ -47,6 +47,14 @@ const businessSchema = new mongoose.Schema(
     description: { type: String, default: "", trim: true },
     contact_info: { type: String, default: "", trim: true },
     notification_email: { type: String, default: "", lowercase: true, trim: true },
+    deposit_enabled: { type: Boolean, default: false },
+    deposit_percentage: { type: Number, default: 40, min: 0, max: 100 },
+    deposit_applies_to: {
+      type: String,
+      enum: ["services", "products", "both"],
+      default: "services",
+    },
+    payment_instructions: { type: String, default: "", trim: true },
     ai_personality: { type: String, default: "", trim: true },
   },
   { timestamps: true }
@@ -211,6 +219,18 @@ const orderSchema = new mongoose.Schema(
     items: { type: [orderItemSchema], required: true },
     total_price: { type: Number, required: true },
     status: { type: String, default: "placed" },
+    payment_status: {
+      type: String,
+      enum: ["not_required", "pending_deposit", "deposit_paid"],
+      default: "not_required",
+    },
+    deposit_enabled: { type: Boolean, default: false },
+    deposit_percentage: { type: Number, default: 0 },
+    deposit_applies_to: { type: String, default: "services" },
+    deposit_base_price: { type: Number, default: 0 },
+    deposit_amount: { type: Number, default: 0 },
+    balance_due: { type: Number, default: 0 },
+    payment_instructions: { type: String, default: "", trim: true },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
@@ -804,13 +824,88 @@ function formatOrderItems(items, currency = "$") {
     .join("\n");
 }
 
-function formatOrderSummary(order, currency = "$") {
-  return `Order ${order.order_id}
-Status: ${order.status}
+function depositAppliesToOrder(business = {}, items = []) {
+  if (!business.deposit_enabled) {
+    return false;
+  }
+
+  const appliesTo = business.deposit_applies_to || "services";
+
+  if (appliesTo === "both") {
+    return true;
+  }
+
+  return items.some(item => normalizedOfferingType(item.type) === (appliesTo === "products" ? "product" : "service"));
+}
+
+function buildDepositDetails(business = {}, order = {}) {
+  const items = order.items || [];
+  const total = Number(order.total_price || getOrderTotal(items) || 0);
+  const percentage = Math.max(0, Math.min(100, Number(business.deposit_percentage || 0)));
+  const enabled = depositAppliesToOrder(business, items) && percentage > 0;
+  const depositAmount = enabled ? Math.ceil((total * percentage) / 100) : 0;
+
+  return {
+    payment_status: enabled ? "pending_deposit" : "not_required",
+    deposit_enabled: enabled,
+    deposit_percentage: enabled ? percentage : 0,
+    deposit_applies_to: business.deposit_applies_to || "services",
+    deposit_base_price: enabled ? total : 0,
+    deposit_amount: depositAmount,
+    balance_due: enabled ? Math.max(total - depositAmount, 0) : 0,
+    payment_instructions: enabled ? business.payment_instructions || "" : "",
+  };
+}
+
+function applyDepositDetails(order = {}, business = {}) {
+  Object.assign(order, buildDepositDetails(business, order));
+  return order;
+}
+
+function formatDepositBreakdown(order = {}, currency = "$") {
+  if (!order.deposit_enabled || !order.deposit_amount) {
+    return "";
+  }
+
+  const instructions = order.payment_instructions
+    ? `\n\nPayment instruction:\n${order.payment_instructions}`
+    : "";
+
+  return `\nDeposit required: ${formatMoney(order.deposit_amount, currency)}
+Balance: ${formatMoney(order.balance_due || 0, currency)}${instructions}`;
+}
+
+function formatOrderConfirmationPrompt(order = {}, currency = "$") {
+  return `🛒 Order Summary:
+${formatOrderItems(order.items, currency)}
+
+Total: ${formatMoney(order.total_price, currency)}${formatDepositBreakdown(order, currency)}
+
+👉 Would you like to proceed with the purchase? (yes/no)`;
+}
+
+function formatPlacedOrderReply(order = {}, currency = "$") {
+  const depositNote = order.deposit_enabled
+    ? `\n\nPayment status: ${order.payment_status === "deposit_paid" ? "deposit paid" : "pending deposit"}${formatDepositBreakdown(order, currency)}`
+    : "";
+
+  return `✅ Your order has been placed.
+
+Order ID: ${order.order_id}
 
 ${formatOrderItems(order.items, currency)}
 
-Total: ${formatMoney(order.total_price, currency)}`;
+Total: ${formatMoney(order.total_price, currency)}${depositNote}`;
+}
+
+function formatOrderSummary(order, currency = "$") {
+  return `Order ${order.order_id}
+Status: ${order.status}
+Payment: ${order.payment_status ? order.payment_status.replaceAll("_", " ") : "not required"}
+
+${formatOrderItems(order.items, currency)}
+
+Total: ${formatMoney(order.total_price, currency)}${formatDepositBreakdown(order, currency)}`;
 }
 
 function formatOrderList(orders, currency = "$") {
@@ -842,6 +937,13 @@ function formatCustomerForNotification(customer = {}) {
 }
 
 function formatOrderNotificationText({ business, order, currency, dashboardUrl }) {
+  const paymentDetails = order.deposit_enabled
+    ? `\nPayment:\nStatus: ${(order.payment_status || "pending_deposit").replaceAll("_", " ")}
+Deposit required: ${formatMoney(order.deposit_amount || 0, currency)}
+Balance: ${formatMoney(order.balance_due || 0, currency)}
+${order.payment_instructions ? `Instruction: ${order.payment_instructions}\n` : ""}`
+    : "";
+
   return `New order for ${business.name}
 
 Order ID: ${order.order_id}
@@ -854,6 +956,7 @@ Items:
 ${formatOrderItems(order.items, currency)}
 
 Total: ${formatMoney(order.total_price, currency)}
+${paymentDetails}
 
 Dashboard:
 ${dashboardUrl}`;
@@ -867,6 +970,13 @@ function formatOrderNotificationHtml({ business, order, currency, dashboardUrl }
   const itemLines = order.items
     .map(item => `<li>${escapeHtml(item.product)}: ${item.quantity} x ${escapeHtml(formatMoney(item.unit_price, currency))} = ${escapeHtml(formatMoney(item.total_price, currency))}</li>`)
     .join("");
+  const paymentHtml = order.deposit_enabled
+    ? `<h3>Payment</h3>
+      <p><strong>Status:</strong> ${escapeHtml((order.payment_status || "pending_deposit").replaceAll("_", " "))}</p>
+      <p><strong>Deposit required:</strong> ${escapeHtml(formatMoney(order.deposit_amount || 0, currency))}</p>
+      <p><strong>Balance:</strong> ${escapeHtml(formatMoney(order.balance_due || 0, currency))}</p>
+      ${order.payment_instructions ? `<p><strong>Instruction:</strong> ${escapeHtml(order.payment_instructions)}</p>` : ""}`
+    : "";
 
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#142018">
@@ -878,6 +988,7 @@ function formatOrderNotificationHtml({ business, order, currency, dashboardUrl }
       <h3>Items</h3>
       <ul>${itemLines}</ul>
       <p><strong>Total:</strong> ${escapeHtml(formatMoney(order.total_price, currency))}</p>
+      ${paymentHtml}
       <p><a href="${escapeHtml(dashboardUrl)}">Open dashboard</a></p>
     </div>
   `;
@@ -1267,7 +1378,22 @@ Return JSON only:
 
 app.post("/businesses", async (req, res) => {
   try {
-    const { businessId, name, email, password, currency, tone, description, contact_info, notification_email, ai_personality } = req.body;
+    const {
+      businessId,
+      name,
+      email,
+      password,
+      currency,
+      tone,
+      description,
+      contact_info,
+      notification_email,
+      deposit_enabled,
+      deposit_percentage,
+      deposit_applies_to,
+      payment_instructions,
+      ai_personality,
+    } = req.body;
 
     if (!businessId || !name || !email) {
       return res.status(400).json({ error: "businessId, name, and email are required." });
@@ -1285,6 +1411,12 @@ app.post("/businesses", async (req, res) => {
       description: description || "",
       contact_info: contact_info || "",
       notification_email: notification_email ? String(notification_email).toLowerCase().trim() : normalizedEmail,
+      deposit_enabled: Boolean(deposit_enabled),
+      deposit_percentage: Math.max(0, Math.min(100, Number(deposit_percentage || 0))),
+      deposit_applies_to: ["services", "products", "both"].includes(deposit_applies_to)
+        ? deposit_applies_to
+        : "services",
+      payment_instructions: payment_instructions || "",
       ai_personality: ai_personality || "",
     };
 
@@ -1717,6 +1849,37 @@ app.patch("/orders/:orderId/status", requireAuth, async (req, res) => {
   }
 });
 
+app.patch("/orders/:orderId/payment-status", requireAuth, async (req, res) => {
+  try {
+    const allowedStatuses = ["not_required", "pending_deposit", "deposit_paid"];
+    const { payment_status } = req.body;
+
+    if (!requireMatchingBusiness(req, res, req.body.businessId || req.businessId)) {
+      return;
+    }
+
+    if (!allowedStatuses.includes(payment_status)) {
+      return res.status(400).json({
+        error: `payment_status must be one of: ${allowedStatuses.join(", ")}.`,
+      });
+    }
+
+    const order = await Order.findOneAndUpdate(
+      { order_id: req.params.orderId, businessId: req.businessId },
+      { payment_status },
+      { returnDocument: "after", runValidators: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found." });
+    }
+
+    return res.json({ order });
+  } catch (error) {
+    return res.status(500).json({ error: "Could not update payment status." });
+  }
+});
+
 async function chatHandler(req, res) {
   try {
     const rawMessage = req.body.message;
@@ -1875,6 +2038,7 @@ async function chatHandler(req, res) {
         customer,
         ...memory.pendingOrder,
       };
+      applyDepositDetails(order, business);
 
       let stockReduced = false;
       let savedOrder;
@@ -1906,7 +2070,7 @@ async function chatHandler(req, res) {
       notifyBusinessOfOrder({ business, order: orderData, currency, req });
 
       return res.json({
-        reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
+        reply: formatPlacedOrderReply(orderData, currency),
         order: orderData,
       });
     }
@@ -1982,6 +2146,7 @@ async function chatHandler(req, res) {
         total_price: 0,
       };
       addOrUpdateOrderItem(memory.pendingOrder, productFromMessage, quantity);
+      applyDepositDetails(memory.pendingOrder, business);
       const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
       if (!stockCheck.ok) {
@@ -1993,7 +2158,7 @@ async function chatHandler(req, res) {
       }
 
       return res.json({
-        reply: `Great choice!\n\n🛒 Order Summary:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+        reply: `Great choice!\n\n${formatOrderConfirmationPrompt(memory.pendingOrder, currency)}`,
         order: null,
       });
     }
@@ -2025,7 +2190,7 @@ async function chatHandler(req, res) {
         ? products
         : ((aiProduct ? [aiProduct] : productCategory?.matches) || products);
       const pendingNote = memory.pendingOrder?.items?.length
-        ? `\n\nYour pending order is still here:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}`
+        ? `\n\nYour pending order is still here:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}`
         : "";
 
       if (matchingProducts.length === 1) {
@@ -2080,6 +2245,7 @@ async function chatHandler(req, res) {
         }
 
         addOrUpdateOrderItem(memory.pendingOrder, selectedProduct, selectedProduct.stock_quantity);
+        applyDepositDetails(memory.pendingOrder, business);
         const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
         if (!stockCheck.ok) {
@@ -2097,7 +2263,7 @@ async function chatHandler(req, res) {
         memory.lastIntent = "order";
 
         return res.json({
-          reply: `Got it. I've set ${offeringDisplayName(selectedProduct)} to all available stock (${selectedProduct.stock_quantity}).\n\n🛒 Order Summary:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+          reply: `Got it. I've set ${offeringDisplayName(selectedProduct)} to all available stock (${selectedProduct.stock_quantity}).\n\n${formatOrderConfirmationPrompt(memory.pendingOrder, currency)}`,
           order: null,
         });
       }
@@ -2113,6 +2279,7 @@ async function chatHandler(req, res) {
         const previousOrder = JSON.parse(JSON.stringify(memory.pendingOrder));
         addOrUpdateOrderItem(memory.pendingOrder, selectedProduct, aiQuantity);
         memory.pendingOrder.total_price = getOrderTotal(memory.pendingOrder.items);
+        applyDepositDetails(memory.pendingOrder, business);
         const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
         if (!stockCheck.ok) {
@@ -2127,7 +2294,7 @@ async function chatHandler(req, res) {
         memory.awaitingProductChoice = null;
 
         return res.json({
-          reply: `${existingItem ? "Got it. I've updated your order" : "Got it. I've added that to your order"}:\n\n🛒 Order Summary:\n${formatOrderItems(memory.pendingOrder.items, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}\n\n👉 Would you like to proceed with the purchase? (yes/no)`,
+          reply: `${existingItem ? "Got it. I've updated your order" : "Got it. I've added that to your order"}:\n\n${formatOrderConfirmationPrompt(memory.pendingOrder, currency)}`,
           order: null,
         });
       }
@@ -2270,6 +2437,7 @@ async function chatHandler(req, res) {
         items: orderItems,
         total_price: getOrderTotal(orderItems),
       };
+      applyDepositDetails(memory.pendingOrder, business);
       memory.awaitingProductChoice = {
         action: "order",
         keyword: ambiguousProductChoice.keyword,
@@ -2278,7 +2446,7 @@ async function chatHandler(req, res) {
       };
 
       const summary = orderItems.length > 0
-        ? `\n\nCurrent order:\n${formatOrderItems(orderItems, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}`
+        ? `\n\nCurrent order:\n${formatOrderItems(orderItems, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}`
         : "";
 
       return res.json({
@@ -2322,6 +2490,7 @@ async function chatHandler(req, res) {
           );
 
           addOrUpdateOrderItem(memory.pendingOrder, selectedProduct, newQty);
+          applyDepositDetails(memory.pendingOrder, business);
           const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
           if (!stockCheck.ok) {
@@ -2341,7 +2510,7 @@ async function chatHandler(req, res) {
 🛒 New Order Summary:
 ${formatOrderItems(memory.pendingOrder.items, currency)}
 
-Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
+Total: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}
 
 👉 Would you like to proceed with the purchase? (yes/no)`,
             order: null,
@@ -2363,6 +2532,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 
           const previousOrder = JSON.parse(JSON.stringify(memory.pendingOrder));
           addOrUpdateOrderItem(memory.pendingOrder, selectedProductChoice, qty);
+          applyDepositDetails(memory.pendingOrder, business);
           const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
           if (!stockCheck.ok) {
@@ -2382,7 +2552,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 🛒 New Order Summary:
 ${formatOrderItems(memory.pendingOrder.items, currency)}
 
-Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
+Total: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}
 
 👉 Would you like to proceed with the purchase? (yes/no)`,
             order: null,
@@ -2461,6 +2631,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         }
 
         memory.pendingOrder.total_price = getOrderTotal(memory.pendingOrder.items);
+        applyDepositDetails(memory.pendingOrder, business);
         const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
         if (!stockCheck.ok) {
@@ -2483,7 +2654,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 🛒 New Order Summary:
 ${formatOrderItems(memory.pendingOrder.items, currency)}
 
-Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
+Total: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}
 
 👉 Would you like to proceed with the purchase? (yes/no)`,
           order: null,
@@ -2501,6 +2672,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
           existingItem.quantity = newQty;
           existingItem.total_price = newQty * existingItem.unit_price;
           memory.pendingOrder.total_price = getOrderTotal(memory.pendingOrder.items);
+          applyDepositDetails(memory.pendingOrder, business);
           const stockCheck = await checkStockAvailability(memory.pendingOrder.items, businessId);
 
           if (!stockCheck.ok) {
@@ -2517,7 +2689,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 🛒 New Order Summary:
 ${formatOrderItems(memory.pendingOrder.items, currency)}
 
-Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
+Total: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}
 
 👉 Would you like to proceed with the purchase? (yes/no)`,
             order: null,
@@ -2550,6 +2722,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
           customer,
           ...memory.pendingOrder,
         };
+        applyDepositDetails(order, business);
 
         let stockReduced = false;
         let savedOrder;
@@ -2581,7 +2754,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
         notifyBusinessOfOrder({ business, order: orderData, currency, req });
 
         return res.json({
-          reply: `✅ Your order has been placed.\n\nOrder ID: ${orderData.order_id}\n\n${formatOrderItems(orderData.items, currency)}\n\nTotal: ${formatMoney(orderData.total_price, currency)}`,
+          reply: formatPlacedOrderReply(orderData, currency),
           order: orderData,
         });
       }
@@ -2602,7 +2775,7 @@ Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
 
 ${formatOrderItems(memory.pendingOrder.items, currency)}
 
-Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
+Total: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}
 
 👉 You can:
 - Say "yes" to confirm
@@ -2777,6 +2950,7 @@ RULES:
           items: orderItems,
           total_price: getOrderTotal(orderItems),
         };
+        applyDepositDetails(memory.pendingOrder, business);
         memory.awaitingProductChoice = {
           action: "order",
           keyword: ambiguousProductChoice.keyword,
@@ -2785,7 +2959,7 @@ RULES:
         };
 
         const summary = orderItems.length > 0
-          ? `\n\nCurrent order:\n${formatOrderItems(orderItems, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}`
+          ? `\n\nCurrent order:\n${formatOrderItems(orderItems, currency)}\n\nTotal: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}`
           : "";
 
         return res.json({
@@ -2808,6 +2982,7 @@ RULES:
           items: orderItems,
           total_price: getOrderTotal(orderItems),
         };
+        applyDepositDetails(memory.pendingOrder, business);
         memory.lastProduct = missingQuantityItem.product;
 
         return res.json({
@@ -2829,6 +3004,7 @@ RULES:
         items: orderItems,
         total_price: getOrderTotal(orderItems),
       };
+      applyDepositDetails(memory.pendingOrder, business);
 
       return res.json({
         reply: `Great choice!
@@ -2836,7 +3012,7 @@ RULES:
 🛒 Order Summary:
 ${formatOrderItems(orderItems, currency)}
 
-Total: ${formatMoney(memory.pendingOrder.total_price, currency)}
+Total: ${formatMoney(memory.pendingOrder.total_price, currency)}${formatDepositBreakdown(memory.pendingOrder, currency)}
 
 👉 Would you like to proceed with the purchase? (yes/no)`,
         order: null,
