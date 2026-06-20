@@ -416,6 +416,21 @@
       text-transform: uppercase;
     }
 
+    .proof-preview {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: block;
+      margin-top: 8px;
+      max-height: 180px;
+      max-width: 260px;
+      object-fit: cover;
+    }
+
+    .proof-link {
+      color: var(--brand-dark);
+      font-weight: 800;
+    }
+
     .empty {
       color: var(--muted);
       padding: 8px 0;
@@ -1067,7 +1082,15 @@
           `Deposit required: ${money(order.deposit_amount || 0)}`,
           `Balance: ${money(order.balance_due || 0)}`,
           order.payment_instructions ? `Instruction: ${escapeHtml(order.payment_instructions)}` : "",
+          order.payment_proof?.uploaded_at ? `Proof uploaded: ${new Date(order.payment_proof.uploaded_at).toLocaleString()}` : "Proof uploaded: not yet",
         ].filter(Boolean) : [];
+        const proof = order.payment_proof || {};
+        const proofUrl = proof.data_url || "";
+        const proofName = escapeHtml(proof.file_name || "payment proof");
+        const proofMarkup = proofUrl ? `
+          <a class="proof-link" href="${escapeHtml(proofUrl)}" target="_blank" rel="noopener">View ${proofName}</a>
+          ${String(proof.mime_type || "").startsWith("image/") ? `<img class="proof-preview" src="${escapeHtml(proofUrl)}" alt="${proofName}">` : ""}
+        ` : "";
 
         return `
         <article class="order">
@@ -1089,7 +1112,7 @@
             ` : ""}
           </div>
           ${customerLines.length ? `<div class="customer-card"><small>Customer details</small>${customerLines.map(line => `<span>${line}</span>`).join("")}</div>` : ""}
-          ${paymentLines.length ? `<div class="customer-card"><small>Payment</small>${paymentLines.map(line => `<span>${line}</span>`).join("")}</div>` : ""}
+          ${paymentLines.length ? `<div class="customer-card"><small>Payment</small>${paymentLines.map(line => `<span>${line}</span>`).join("")}${proofMarkup}</div>` : ""}
           <pre>${order.items.map(item =>
             `${item.product}: ${item.quantity} x ${money(item.unit_price)} = ${money(item.total_price)}`
           ).join("\n")}</pre>

@@ -267,6 +267,23 @@
       padding: 9px 12px;
     }
 
+    .proof-card {
+      background: rgba(255, 250, 235, 0.7);
+      border: 1px dashed rgba(185, 130, 30, 0.36);
+    }
+
+    .proof-actions {
+      align-items: end;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr 1fr auto;
+    }
+
+    .proof-status {
+      color: var(--muted);
+      margin: 0;
+    }
+
     button {
       border: 0;
       border-radius: 16px;
@@ -297,6 +314,10 @@
       }
 
       .details-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .proof-actions {
         grid-template-columns: 1fr;
       }
 
@@ -372,6 +393,26 @@
       </div>
     </section>
 
+    <section class="details-card proof-card">
+      <div class="details-head">
+        <div>
+          <h2>Payment proof</h2>
+          <p>After paying a deposit, upload your receipt here so the business owner can confirm it.</p>
+        </div>
+        <small>JPG, PNG, WebP, or PDF under 4MB.</small>
+      </div>
+      <div class="proof-actions">
+        <label>Order ID
+          <input id="proofOrderId" placeholder="e.g. SH-20260620-0001">
+        </label>
+        <label>Receipt / proof
+          <input id="paymentProofFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+        </label>
+        <button id="uploadProofButton" type="button">Upload proof</button>
+      </div>
+      <p class="proof-status" id="proofStatus">Place an order first, then upload your payment proof here.</p>
+    </section>
+
     <section class="messages" id="messages">
       <div class="empty" id="emptyState">Say hello, ask what is available, or place an order.</div>
     </section>
@@ -391,6 +432,7 @@
       products: [],
       offeringMode: "mixed",
       customerId: localStorage.getItem(sessionKey) || crypto.randomUUID(),
+      lastOrderId: localStorage.getItem(`lastOrderId:${businessId}`) || "",
     };
 
     localStorage.setItem(sessionKey, state.customerId);
@@ -415,10 +457,16 @@
       customerNote: document.querySelector("#customerNote"),
       messages: document.querySelector("#messages"),
       emptyState: document.querySelector("#emptyState"),
+      proofOrderId: document.querySelector("#proofOrderId"),
+      paymentProofFile: document.querySelector("#paymentProofFile"),
+      uploadProofButton: document.querySelector("#uploadProofButton"),
+      proofStatus: document.querySelector("#proofStatus"),
       chatForm: document.querySelector("#chatForm"),
       messageInput: document.querySelector("#messageInput"),
       sendButton: document.querySelector("#sendButton"),
     };
+
+    els.proofOrderId.value = state.lastOrderId;
 
     function loadCustomerDetails() {
       const saved = JSON.parse(localStorage.getItem(detailsKey) || "{}");
@@ -497,6 +545,28 @@
       els.messages.scrollTop = els.messages.scrollHeight;
     }
 
+    function rememberOrderIdFromReply(reply) {
+      const match = String(reply || "").match(/\bSH-\d{8}-\d{4}\b/i);
+
+      if (!match) {
+        return;
+      }
+
+      state.lastOrderId = match[0].toUpperCase();
+      localStorage.setItem(`lastOrderId:${businessId}`, state.lastOrderId);
+      els.proofOrderId.value = state.lastOrderId;
+      els.proofStatus.textContent = `Order ${state.lastOrderId} saved. If you paid a deposit, upload your proof here.`;
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Could not read payment proof file."));
+        reader.readAsDataURL(file);
+      });
+    }
+
     async function loadBusiness() {
       const [businessResponse, productsResponse] = await Promise.all([
         fetch(`/public/businesses/${encodeURIComponent(businessId)}`),
@@ -555,6 +625,44 @@
       return body.reply || body.error || "Sorry, something went wrong.";
     }
 
+    async function uploadPaymentProof() {
+      const orderId = els.proofOrderId.value.trim().toUpperCase();
+      const file = els.paymentProofFile.files[0];
+
+      if (!orderId) {
+        throw new Error("Please enter the order ID first.");
+      }
+
+      if (!file) {
+        throw new Error("Please choose a receipt or proof file.");
+      }
+
+      if (file.size > 4 * 1024 * 1024) {
+        throw new Error("Payment proof is too large. Please upload a file under 4MB.");
+      }
+
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await fetch(`/public/orders/${encodeURIComponent(businessId)}/${encodeURIComponent(orderId)}/payment-proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: state.customerId,
+          proof: {
+            file_name: file.name,
+            mime_type: file.type,
+            data_url: dataUrl,
+          },
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error || "Could not upload payment proof.");
+      }
+
+      return body.message || "Payment proof uploaded.";
+    }
+
     els.chatForm.addEventListener("submit", async event => {
       event.preventDefault();
       const message = els.messageInput.value.trim();
@@ -566,6 +674,7 @@
 
       try {
         const reply = await sendMessage(message);
+        rememberOrderIdFromReply(reply);
         addMessage("assistant", reply);
       } catch (error) {
         addMessage("assistant", error.message);
@@ -583,6 +692,20 @@
     });
 
     els.copyShareMessage.addEventListener("click", copyShareMessage);
+
+    els.uploadProofButton.addEventListener("click", async () => {
+      els.uploadProofButton.disabled = true;
+      els.proofStatus.textContent = "Uploading payment proof...";
+
+      try {
+        els.proofStatus.textContent = await uploadPaymentProof();
+        els.paymentProofFile.value = "";
+      } catch (error) {
+        els.proofStatus.textContent = error.message;
+      } finally {
+        els.uploadProofButton.disabled = false;
+      }
+    });
 
     [els.customerName, els.customerPhone, els.customerAddress, els.preferredDate, els.preferredTime, els.customerNote].forEach(input => {
       input.addEventListener("input", saveCustomerDetails);

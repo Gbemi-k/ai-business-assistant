@@ -12,7 +12,7 @@ dns.setDefaultResultOrder("ipv4first");
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "6mb" }));
 app.use(express.static("public"));
 
 app.get("/", (req, res) => {
@@ -210,6 +210,16 @@ const customerSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentProofSchema = new mongoose.Schema(
+  {
+    file_name: { type: String, default: "", trim: true },
+    mime_type: { type: String, default: "", trim: true },
+    data_url: { type: String, default: "" },
+    uploaded_at: { type: Date },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     order_id: { type: String, required: true, index: true },
@@ -231,6 +241,7 @@ const orderSchema = new mongoose.Schema(
     deposit_amount: { type: Number, default: 0 },
     balance_due: { type: Number, default: 0 },
     payment_instructions: { type: String, default: "", trim: true },
+    payment_proof: { type: paymentProofSchema, default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
@@ -618,6 +629,41 @@ function customerDetailsPrompt(customer) {
   }
 
   return `Before I place the order, please add ${missing.join(" and ")} in the customer details section, then send "yes" again.`;
+}
+
+function sanitizePaymentProof(proof = {}) {
+  const fileName = String(proof.file_name || "payment-proof").trim().slice(0, 140);
+  const mimeType = String(proof.mime_type || "").trim().toLowerCase();
+  const dataUrl = String(proof.data_url || "").trim();
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+  if (!allowedTypes.includes(mimeType)) {
+    const error = new Error("Payment proof must be a JPG, PNG, WebP image, or PDF.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!dataUrl.startsWith(`data:${mimeType};base64,`)) {
+    const error = new Error("Payment proof file data is invalid.");
+    error.status = 400;
+    throw error;
+  }
+
+  const base64Data = dataUrl.split(",")[1] || "";
+  const fileSize = Buffer.byteLength(base64Data, "base64");
+
+  if (fileSize > 4 * 1024 * 1024) {
+    const error = new Error("Payment proof is too large. Please upload a file under 4MB.");
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    file_name: fileName,
+    mime_type: mimeType,
+    data_url: dataUrl,
+    uploaded_at: new Date(),
+  };
 }
 
 function findAmbiguousProductChoice(message, products) {
@@ -1877,6 +1923,36 @@ app.patch("/orders/:orderId/payment-status", requireAuth, async (req, res) => {
     return res.json({ order });
   } catch (error) {
     return res.status(500).json({ error: "Could not update payment status." });
+  }
+});
+
+app.post("/public/orders/:businessId/:orderId/payment-proof", async (req, res) => {
+  try {
+    const businessId = req.params.businessId;
+    const orderId = req.params.orderId;
+    const userId = req.body.userId || "default";
+    const proof = sanitizePaymentProof(req.body.proof);
+
+    const order = await Order.findOneAndUpdate(
+      { businessId, order_id: orderId, userId },
+      { payment_proof: proof },
+      { returnDocument: "after", runValidators: true }
+    ).lean();
+
+    if (!order) {
+      return res.status(404).json({
+        error: "Order not found for this customer and business.",
+      });
+    }
+
+    return res.json({
+      message: "Payment proof uploaded. The business owner can now review it in their dashboard.",
+      order,
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      error: error.status ? error.message : "Could not upload payment proof.",
+    });
   }
 });
 
