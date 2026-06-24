@@ -3,34 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ChatOrder - AI Ordering for Small Businesses</title>
+  <title>ChatOrder - AI Ordering for Modern Businesses</title>
   <style>
     :root {
-      --ink: #17211b;
-      --muted: #627067;
-      --brand: #1f6b4e;
-      --brand-dark: #123c2d;
-      --cream: #f7f0dd;
-      --gold: #c98923;
-      --panel: rgba(255, 255, 255, 0.9);
-      --line: rgba(23, 33, 27, 0.12);
-      --shadow: 0 28px 80px rgba(23, 33, 27, 0.15);
-      font-family: "Aptos", "Segoe UI", sans-serif;
+      --bg: #0f0f14;
+      --bg-2: #151625;
+      --ink: #f7f8ff;
+      --muted: #a7abc7;
+      --line: rgba(255, 255, 255, 0.12);
+      --glass: rgba(255, 255, 255, 0.075);
+      --glass-strong: rgba(255, 255, 255, 0.12);
+      --purple: #8f5cff;
+      --blue: #17c7ff;
+      --green: #61f5ba;
+      --shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+      --glow: 0 0 45px rgba(23, 199, 255, 0.28), 0 0 80px rgba(143, 92, 255, 0.22);
+      font-family: Inter, "SF Pro Display", "Segoe UI", sans-serif;
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
+      background:
+        radial-gradient(circle at 15% 10%, rgba(143, 92, 255, 0.34), transparent 32rem),
+        radial-gradient(circle at 85% 12%, rgba(23, 199, 255, 0.24), transparent 30rem),
+        radial-gradient(circle at 50% 95%, rgba(97, 245, 186, 0.12), transparent 34rem),
+        linear-gradient(135deg, #0f0f14, #11121c 44%, #090a0f);
       color: var(--ink);
       margin: 0;
       min-height: 100vh;
-      background:
-        radial-gradient(circle at top left, rgba(201, 137, 35, 0.24), transparent 32rem),
-        radial-gradient(circle at bottom right, rgba(31, 107, 78, 0.2), transparent 34rem),
-        repeating-linear-gradient(90deg, rgba(23, 33, 27, 0.035) 0 1px, transparent 1px 78px),
-        var(--cream);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 72px 72px;
+      content: "";
+      inset: 0;
+      mask-image: linear-gradient(to bottom, black, transparent 78%);
+      pointer-events: none;
+      position: fixed;
     }
 
     a {
@@ -40,38 +60,50 @@
 
     .page {
       margin: 0 auto;
-      max-width: 1120px;
+      max-width: 1220px;
       padding: 24px;
+      position: relative;
+      z-index: 1;
     }
 
     .nav {
       align-items: center;
+      backdrop-filter: blur(22px);
+      background: rgba(15, 15, 20, 0.66);
+      border: 1px solid var(--line);
+      border-radius: 24px;
       display: flex;
       justify-content: space-between;
-      margin-bottom: 46px;
+      margin-bottom: 64px;
+      padding: 12px;
     }
 
     .logo {
       align-items: center;
       display: inline-flex;
-      font-weight: 950;
+      font-size: 1.02rem;
+      font-weight: 900;
       gap: 10px;
       letter-spacing: -0.03em;
     }
 
     .logo-mark {
       align-items: center;
-      background: var(--brand);
+      background: linear-gradient(135deg, var(--purple), var(--blue));
       border-radius: 14px;
-      color: white;
+      box-shadow: var(--glow);
       display: inline-flex;
-      height: 38px;
+      height: 40px;
       justify-content: center;
-      width: 38px;
+      width: 40px;
     }
 
-    .nav-actions {
+    .nav-actions,
+    .hero-actions,
+    .badges,
+    .suggestions {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
@@ -82,12 +114,20 @@
       display: inline-flex;
       font-weight: 850;
       justify-content: center;
-      padding: 12px 17px;
+      padding: 12px 18px;
+      transition: 180ms ease;
+    }
+
+    .button:hover,
+    .chip:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
     }
 
     .button.primary {
-      background: var(--brand);
-      border-color: var(--brand);
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      border-color: transparent;
+      box-shadow: var(--glow);
       color: white;
     }
 
@@ -95,88 +135,147 @@
       align-items: center;
       display: grid;
       gap: 56px;
-      grid-template-columns: minmax(0, 0.95fr) minmax(340px, 0.78fr);
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 0.78fr);
+      min-height: 640px;
     }
 
     .eyebrow {
-      background: rgba(255, 255, 255, 0.72);
+      align-items: center;
+      background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--line);
       border-radius: 999px;
-      color: var(--brand-dark);
+      color: #dfe8ff;
       display: inline-flex;
       font-size: 0.86rem;
       font-weight: 850;
-      margin-bottom: 18px;
+      gap: 8px;
+      margin-bottom: 20px;
       padding: 9px 13px;
     }
 
+    .eyebrow::before {
+      background: var(--green);
+      border-radius: 999px;
+      box-shadow: 0 0 18px rgba(97, 245, 186, 0.9);
+      content: "";
+      height: 8px;
+      width: 8px;
+    }
+
     h1 {
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(3.1rem, 6vw, 5.35rem);
-      letter-spacing: -0.07em;
-      line-height: 0.9;
+      font-size: clamp(3.7rem, 8vw, 7.4rem);
+      letter-spacing: -0.09em;
+      line-height: 0.86;
       margin: 0;
-      max-width: 620px;
+      max-width: 790px;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #ffffff, #a9dfff 48%, #b999ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
     }
 
     .lead {
       color: var(--muted);
-      font-size: 1.2rem;
-      line-height: 1.55;
-      margin: 24px 0;
-      max-width: 620px;
+      font-size: clamp(1.05rem, 2vw, 1.28rem);
+      line-height: 1.7;
+      margin: 26px 0;
+      max-width: 680px;
     }
 
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+    .badges {
+      margin-top: 24px;
+    }
+
+    .badge,
+    .chip {
+      background: rgba(255, 255, 255, 0.075);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #d8dcff;
+      font-size: 0.9rem;
+      font-weight: 780;
+      padding: 9px 12px;
     }
 
     .preview {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 32px;
-      box-shadow: var(--shadow);
+      animation: floatPreview 6s ease-in-out infinite;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.055));
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 34px;
+      box-shadow: var(--shadow), var(--glow);
       display: grid;
       gap: 14px;
-      justify-self: end;
-      max-width: 400px;
       padding: 18px;
-      transform: rotate(1deg);
-      width: 100%;
+      position: relative;
     }
 
-    .chat-card,
-    .dashboard-card,
-    .feature-card,
-    .step {
-      background: rgba(255, 255, 255, 0.82);
+    .preview::after {
+      background: linear-gradient(135deg, rgba(143, 92, 255, 0.4), rgba(23, 199, 255, 0.3));
+      border-radius: inherit;
+      content: "";
+      filter: blur(34px);
+      inset: 18px;
+      opacity: 0.55;
+      position: absolute;
+      z-index: -1;
+    }
+
+    .glass-card {
+      backdrop-filter: blur(22px);
+      background: rgba(10, 12, 22, 0.62);
       border: 1px solid var(--line);
-      border-radius: 22px;
+      border-radius: 26px;
       padding: 18px;
     }
 
     .message {
       border-radius: 18px;
       line-height: 1.45;
-      margin: 10px 0;
+      margin: 11px 0;
       padding: 12px 14px;
     }
 
     .message.customer {
-      background: #e8f3ed;
-      margin-left: 42px;
+      background: rgba(255, 255, 255, 0.12);
+      margin-left: 44px;
     }
 
     .message.ai {
-      background: #102117;
-      color: white;
-      margin-right: 28px;
+      background: linear-gradient(135deg, rgba(143, 92, 255, 0.26), rgba(23, 199, 255, 0.2));
+      margin-right: 30px;
     }
 
-    .dashboard-card {
-      background: #fff8e8;
+    .typing {
+      align-items: center;
+      display: inline-flex;
+      gap: 5px;
+    }
+
+    .typing span {
+      animation: typingDot 1s infinite ease-in-out;
+      background: white;
+      border-radius: 50%;
+      height: 6px;
+      opacity: 0.45;
+      width: 6px;
+    }
+
+    .typing span:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .typing span:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    .order-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 18px;
     }
 
     .order-line {
@@ -187,24 +286,44 @@
       margin-top: 10px;
     }
 
-    .pill {
-      background: #e8efe7;
+    .status-track {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(3, 1fr);
+      margin-top: 16px;
+    }
+
+    .status-track span {
+      background: rgba(255, 255, 255, 0.08);
       border-radius: 999px;
-      color: var(--brand-dark);
-      font-size: 0.78rem;
-      font-weight: 850;
-      padding: 6px 9px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .status-track span:first-child {
+      background: rgba(97, 245, 186, 0.18);
+      color: #bdfdde;
     }
 
     .section {
-      margin-top: 72px;
+      margin-top: 92px;
     }
 
     .section h2 {
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(2rem, 4vw, 3.4rem);
-      letter-spacing: -0.05em;
+      font-size: clamp(2rem, 4.5vw, 4rem);
+      letter-spacing: -0.06em;
+      line-height: 0.95;
       margin: 0 0 18px;
+    }
+
+    .section-lead {
+      color: var(--muted);
+      line-height: 1.7;
+      margin: 0 0 24px;
+      max-width: 680px;
     }
 
     .grid {
@@ -213,44 +332,66 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .feature-card,
+    .step,
+    .cta {
+      background: var(--glass);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
+      padding: 22px;
+    }
+
     .feature-card strong,
     .step strong {
       display: block;
-      font-size: 1.05rem;
-      margin-bottom: 8px;
+      font-size: 1.06rem;
+      margin-bottom: 9px;
     }
 
     .feature-card p,
     .step p {
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.55;
       margin: 0;
     }
 
     .cta {
       align-items: center;
-      background: var(--brand-dark);
-      border-radius: 30px;
-      color: white;
       display: flex;
       gap: 18px;
       justify-content: space-between;
-      padding: 26px;
+      margin-bottom: 36px;
     }
 
     .cta p {
-      color: rgba(255, 255, 255, 0.78);
-      line-height: 1.5;
+      color: var(--muted);
+      line-height: 1.6;
       margin: 8px 0 0;
     }
 
-    .cta .button {
-      background: white;
-      color: var(--brand-dark);
-      flex: 0 0 auto;
+    @keyframes floatPreview {
+      0%, 100% {
+        transform: translateY(0) rotate(1deg);
+      }
+
+      50% {
+        transform: translateY(-14px) rotate(-1deg);
+      }
     }
 
-    @media (max-width: 860px) {
+    @keyframes typingDot {
+      0%, 80%, 100% {
+        transform: translateY(0);
+      }
+
+      40% {
+        opacity: 1;
+        transform: translateY(-4px);
+      }
+    }
+
+    @media (max-width: 900px) {
       .hero,
       .grid,
       .cta {
@@ -258,21 +399,36 @@
       }
 
       .hero {
-        display: grid;
+        min-height: auto;
       }
 
       .preview {
-        transform: none;
-      }
-
-      .nav {
-        align-items: flex-start;
-        gap: 12px;
+        animation: none;
       }
 
       .nav,
       .cta {
+        align-items: stretch;
         display: grid;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        padding: 14px;
+      }
+
+      .nav-actions,
+      .hero-actions {
+        display: grid;
+      }
+
+      h1 {
+        font-size: clamp(3rem, 17vw, 4.7rem);
+      }
+
+      .status-track {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -292,78 +448,98 @@
 
     <section class="hero">
       <div>
-        <span class="eyebrow">Built for businesses that sell through chat</span>
-        <h1>Take orders automatically with AI.</h1>
-        <p class="lead">ChatOrder gives every business a simple chat link customers can use to ask questions, choose products or services, and place orders without waiting for manual replies.</p>
+        <span class="eyebrow">AI ordering links for products and services</span>
+        <h1><span class="gradient-text">Turn customer chats into confirmed orders.</span></h1>
+        <p class="lead">ChatOrder gives every business a shareable AI chat link that answers customer questions, collects order details, tracks deposits, and sends orders straight to the dashboard.</p>
         <div class="hero-actions">
           <a class="button primary" href="/admin">Create Business Account</a>
           <a class="button" href="#how-it-works">See How It Works</a>
         </div>
+        <div class="badges" aria-label="ChatOrder capabilities">
+          <span class="badge">Products and services</span>
+          <span class="badge">Deposit proof upload</span>
+          <span class="badge">Business-owned dashboard</span>
+        </div>
       </div>
 
-      <aside class="preview" aria-label="ChatOrder preview">
-        <div class="chat-card">
-          <span class="pill">Customer chat link</span>
-          <div class="message customer">What cakes do you have?</div>
-          <div class="message ai">We have vanilla cake and red velvet cake. Which would you like?</div>
+      <aside class="preview" aria-label="Animated ChatOrder preview">
+        <div class="glass-card">
+          <span class="badge">Customer chat link</span>
+          <div class="message customer">What do you have available?</div>
+          <div class="message ai">We have vanilla cake, red velvet cake, and fruit cake. Which would you like?</div>
           <div class="message customer">I want 2 red velvet cakes</div>
+          <div class="message ai">
+            <span class="typing" aria-label="AI is typing"><span></span><span></span><span></span></span>
+          </div>
         </div>
-        <div class="dashboard-card">
-          <span class="pill">Dashboard</span>
+        <div class="order-card">
+          <span class="badge">Live dashboard</span>
           <div class="order-line">
             <strong>New order received</strong>
-            <span>&#8358;40,000</span>
+            <span>&#8358;60,000</span>
           </div>
           <div class="order-line">
-            <span>2 x red velvet cake</span>
-            <span class="pill">placed</span>
+            <span>Deposit required</span>
+            <span>&#8358;24,000</span>
           </div>
+          <div class="status-track" aria-label="Order tracking status">
+            <span>Placed</span>
+            <span>Processing</span>
+            <span>Delivered</span>
+          </div>
+        </div>
+        <div class="suggestions" aria-label="Smart suggestions">
+          <span class="chip">Cakes</span>
+          <span class="chip">Nails</span>
+          <span class="chip">Water packs</span>
+          <span class="chip">Cleaning</span>
         </div>
       </aside>
     </section>
 
     <section class="section" id="how-it-works">
-      <h2>How it works</h2>
+      <h2>Built for the way customers already buy.</h2>
+      <p class="section-lead">No app download. No complicated store setup. A business shares one link, customers chat naturally, and the dashboard keeps the owner in control.</p>
       <div class="grid">
         <article class="step">
-          <strong>1. Add products or services</strong>
-          <p>Business owners add prices, stock, service details, and common names customers may type.</p>
+          <strong>1. Add your offers</strong>
+          <p>Add products, services, prices, stock, packages, aliases, and deposit settings from the admin dashboard.</p>
         </article>
         <article class="step">
-          <strong>2. Share the chat link</strong>
-          <p>Customers open the business link from WhatsApp, Instagram bio, TikTok, or direct messages.</p>
+          <strong>2. Share your AI link</strong>
+          <p>Put the link in WhatsApp, Instagram, TikTok, your bio, or send it directly to customers.</p>
         </article>
         <article class="step">
-          <strong>3. Receive orders instantly</strong>
-          <p>Orders appear in the dashboard with customer details, order status, sound alerts, and badges.</p>
+          <strong>3. Manage orders fast</strong>
+          <p>See orders, customer details, payment proof, order status, and delivery history in one workspace.</p>
         </article>
       </div>
     </section>
 
     <section class="section">
-      <h2>What businesses get</h2>
+      <h2>Premium automation without losing control.</h2>
       <div class="grid">
         <article class="feature-card">
-          <strong>AI customer assistant</strong>
-          <p>Answers business questions, lists available items, and guides customers through orders.</p>
+          <strong>AI conversation flow</strong>
+          <p>The assistant answers questions, detects products or services, handles quantities, and keeps order context.</p>
         </article>
         <article class="feature-card">
-          <strong>Order dashboard</strong>
-          <p>Track active orders, delivered orders, customer details, and status updates in one place.</p>
+          <strong>Payment proof tracking</strong>
+          <p>Customers can upload deposit proof, while the owner manually confirms payment from the dashboard.</p>
         </article>
         <article class="feature-card">
-          <strong>Made for products and services</strong>
-          <p>Works for cakes, water, nails, cleaning, food, pharmacy items, services, and growing businesses.</p>
+          <strong>Customer-ready pages</strong>
+          <p>Every business gets an official ordering page with contact info, trust messaging, and a chat-first layout.</p>
         </article>
       </div>
     </section>
 
     <section class="section cta">
       <div>
-        <h2>Ready to test ChatOrder?</h2>
-        <p>Create a business account, add your first product or service, and share your customer ordering link.</p>
+        <h2>Launch your first AI order link.</h2>
+        <p>Create a business account, add one product or service, and test a complete customer order in minutes.</p>
       </div>
-      <a class="button" href="/admin">Open Dashboard</a>
+      <a class="button primary" href="/admin">Open Dashboard</a>
     </section>
   </main>
 </body>

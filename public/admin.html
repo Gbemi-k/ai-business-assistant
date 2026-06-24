@@ -6,31 +6,37 @@
   <title>AI Business Assistant Admin</title>
   <style>
     :root {
-      --ink: #18201b;
-      --muted: #67706a;
-      --line: #d8ded7;
-      --panel: #f8faf6;
-      --surface: #ffffff;
-      --brand: #1f6b4e;
-      --brand-dark: #164b38;
-      --accent: #d7a642;
-      --danger: #b83232;
-      --soft: #eaf2ea;
-      --shadow: 0 18px 50px rgba(24, 32, 27, 0.12);
-      font-family: "Aptos", "Segoe UI", sans-serif;
+      --ink: #f7f8ff;
+      --muted: #a7abc7;
+      --line: rgba(255, 255, 255, 0.12);
+      --panel: rgba(255, 255, 255, 0.075);
+      --surface: rgba(255, 255, 255, 0.1);
+      --brand: #8f5cff;
+      --brand-dark: #17c7ff;
+      --accent: #61f5ba;
+      --danger: #ff6b7a;
+      --soft: rgba(255, 255, 255, 0.1);
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+      --glow: 0 0 42px rgba(23, 199, 255, 0.18), 0 0 70px rgba(143, 92, 255, 0.16);
+      font-family: Inter, "SF Pro Display", "Segoe UI", sans-serif;
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
       color: var(--ink);
       background:
-        linear-gradient(135deg, rgba(31, 107, 78, 0.13), rgba(215, 166, 66, 0.1)),
-        repeating-linear-gradient(90deg, rgba(24, 32, 27, 0.025) 0 1px, transparent 1px 80px),
-        #f3f6ef;
+        radial-gradient(circle at 12% 8%, rgba(143, 92, 255, 0.32), transparent 34rem),
+        radial-gradient(circle at 90% 12%, rgba(23, 199, 255, 0.2), transparent 36rem),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 80px),
+        #0f0f14;
       min-height: 100vh;
     }
 
@@ -43,8 +49,8 @@
 
     button {
       border: 0;
-      border-radius: 7px;
-      background: var(--brand);
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
       color: white;
       cursor: pointer;
       font-weight: 700;
@@ -53,34 +59,35 @@
     }
 
     button:hover {
-      background: var(--brand-dark);
-      box-shadow: 0 8px 20px rgba(31, 107, 78, 0.2);
+      box-shadow: var(--glow);
       transform: translateY(-1px);
     }
 
     button.secondary {
       background: var(--soft);
-      color: var(--brand-dark);
+      border: 1px solid var(--line);
+      color: white;
     }
 
     button.secondary:hover {
-      background: #dceadc;
+      background: rgba(255, 255, 255, 0.16);
     }
 
     button.danger {
-      background: #f4dddd;
+      background: rgba(255, 107, 122, 0.14);
       color: var(--danger);
     }
 
     button.danger:hover {
-      background: #ebc8c8;
+      background: rgba(255, 107, 122, 0.22);
       box-shadow: none;
     }
 
     .button-link {
-      border-radius: 7px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
       background: var(--soft);
-      color: var(--brand-dark);
+      color: white;
       display: inline-block;
       font-weight: 700;
       padding: 10px 13px;
@@ -89,8 +96,8 @@
     }
 
     .button-link:hover {
-      background: #dceadc;
-      box-shadow: 0 8px 20px rgba(31, 107, 78, 0.14);
+      background: rgba(255, 255, 255, 0.16);
+      box-shadow: var(--glow);
       transform: translateY(-1px);
     }
 
@@ -108,19 +115,20 @@
     select,
     textarea {
       border: 1px solid var(--line);
-      border-radius: 7px;
+      border-radius: 14px;
       color: var(--ink);
       outline: none;
       padding: 10px 11px;
       width: 100%;
-      background: white;
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
     }
 
     input:focus,
     select:focus,
     textarea:focus {
       border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(31, 107, 78, 0.13);
+      box-shadow: 0 0 0 3px rgba(143, 92, 255, 0.18);
     }
 
     textarea {
@@ -161,16 +169,20 @@
       align-content: start;
     }
 
+    .sidebar {
+      position: sticky;
+      top: 18px;
+    }
+
     .masthead {
       padding: 6px 2px 10px;
     }
 
     .masthead h1 {
       margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
       font-size: clamp(2rem, 4vw, 3.7rem);
       line-height: 0.95;
-      letter-spacing: 0;
+      letter-spacing: -0.07em;
     }
 
     .masthead p {
@@ -180,10 +192,37 @@
       max-width: 670px;
     }
 
+    .sidebar-nav {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .sidebar-nav a {
+      align-items: center;
+      background: rgba(255, 255, 255, 0.075);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      color: white;
+      display: flex;
+      font-weight: 800;
+      justify-content: space-between;
+      padding: 12px 14px;
+      text-decoration: none;
+      transition: 180ms ease;
+    }
+
+    .sidebar-nav a:hover {
+      background: rgba(255, 255, 255, 0.14);
+      box-shadow: var(--glow);
+      transform: translateX(3px);
+    }
+
     .panel {
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid rgba(216, 222, 215, 0.9);
-      border-radius: 8px;
+      backdrop-filter: blur(24px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
       box-shadow: var(--shadow);
       padding: 18px;
     }
@@ -245,10 +284,10 @@
 
     .order-bell {
       align-items: center;
-      background: #fff8e6;
-      border: 1px solid rgba(185, 130, 30, 0.3);
-      border-radius: 14px;
-      color: #5a4215;
+      background: rgba(97, 245, 186, 0.1);
+      border: 1px solid rgba(97, 245, 186, 0.22);
+      border-radius: 18px;
+      color: #c7ffe5;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -258,11 +297,11 @@
     }
 
     .order-bell strong {
-      color: #3d2a08;
+      color: white;
     }
 
     .order-bell.empty {
-      background: #eef5ee;
+      background: rgba(255, 255, 255, 0.075);
       border-color: var(--line);
       color: var(--muted);
     }
@@ -279,7 +318,7 @@
 
     .status.good {
       border-color: var(--brand);
-      color: var(--brand-dark);
+      color: #b7ddff;
     }
 
     .status.bad {
@@ -296,9 +335,9 @@
 
     .setup-list li {
       align-items: center;
-      background: #eef5ee;
+      background: rgba(255, 255, 255, 0.075);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 16px;
       display: flex;
       gap: 9px;
       list-style: none;
@@ -306,16 +345,16 @@
     }
 
     .setup-list li.done {
-      background: #f8faf6;
+      background: rgba(97, 245, 186, 0.1);
       color: var(--muted);
     }
 
     .setup-check {
       align-items: center;
-      background: white;
+      background: rgba(255, 255, 255, 0.1);
       border: 1px solid var(--line);
       border-radius: 999px;
-      color: var(--brand-dark);
+      color: #baffdf;
       display: inline-flex;
       font-weight: 900;
       height: 24px;
@@ -355,8 +394,9 @@
 
     .pill {
       background: var(--soft);
+      border: 1px solid var(--line);
       border-radius: 999px;
-      color: var(--brand-dark);
+      color: white;
       display: inline-flex;
       font-size: 0.8rem;
       font-weight: 800;
@@ -370,8 +410,8 @@
 
     .order {
       border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.055);
       padding: 14px;
     }
 
@@ -388,9 +428,10 @@
     }
 
     .order pre {
-      background: #111a15;
-      border-radius: 8px;
-      color: #e7f0e9;
+      background: rgba(5, 7, 12, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      color: #edf4ff;
       line-height: 1.45;
       margin: 12px 0 0;
       overflow: auto;
@@ -399,10 +440,10 @@
     }
 
     .customer-card {
-      background: #edf5ed;
+      background: rgba(255, 255, 255, 0.075);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      color: var(--brand-dark);
+      border-radius: 16px;
+      color: white;
       display: grid;
       gap: 4px;
       margin-top: 12px;
@@ -427,7 +468,7 @@
     }
 
     .proof-link {
-      color: var(--brand-dark);
+      color: #baffdf;
       font-weight: 800;
     }
 
@@ -441,6 +482,10 @@
       .toolbar,
       .grid.two {
         grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
       }
 
       .shell {
@@ -484,9 +529,16 @@
       <section class="masthead">
         <h1>Admin Console</h1>
         <p>Control the business profile, products, orders, and customer chat from one focused workspace.</p>
+        <nav class="sidebar-nav" aria-label="Dashboard sections">
+          <a href="#profile">Profile <span>01</span></a>
+          <a href="#customer-link">Customer Link <span>02</span></a>
+          <a href="#setup">Setup <span>03</span></a>
+          <a href="#catalog">Catalog <span>04</span></a>
+          <a href="#orders">Orders <span>05</span></a>
+        </nav>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="profile">
         <h2>Business Profile</h2>
         <form id="businessForm" class="grid">
           <label>Business ID
@@ -561,7 +613,7 @@
     </aside>
 
     <section class="workspace">
-      <section class="panel session-bar">
+      <section class="panel session-bar" id="customer-link">
         <p id="sessionInfo">No business loaded.</p>
         <div class="actions">
           <a class="button-link" id="publicChatLink" href="#" target="_blank" rel="noopener">Open customer link</a>
@@ -570,12 +622,12 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="setup">
         <h2>First-time setup</h2>
         <ul class="setup-list" id="setupChecklist"></ul>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="catalog">
         <h2>Products & Services <span class="pill" id="productCount">0 active</span></h2>
         <form id="productForm" class="toolbar">
           <label>Type
@@ -624,7 +676,7 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="orders">
         <h2>Orders <button type="button" class="secondary" id="refreshOrders">Refresh</button></h2>
         <div class="notify-row">
           <button type="button" class="secondary" id="enableOrderSound">Enable order sound</button>

@@ -6,18 +6,19 @@
   <title>Business Chat</title>
   <style>
     :root {
-      --ink: #1c241f;
-      --muted: #657068;
-      --line: rgba(28, 36, 31, 0.14);
-      --panel: rgba(255, 255, 255, 0.9);
-      --brand: #1f6b4e;
-      --brand-dark: #164b38;
-      --cream: #f6f1df;
-      --customer: #e6f3ec;
-      --assistant: #102117;
-      --gold: #b9821e;
-      --shadow: 0 22px 70px rgba(28, 36, 31, 0.16);
-      font-family: "Aptos", "Segoe UI", sans-serif;
+      --ink: #f7f8ff;
+      --muted: #a7abc7;
+      --line: rgba(255, 255, 255, 0.12);
+      --panel: rgba(255, 255, 255, 0.075);
+      --brand: #8f5cff;
+      --brand-dark: #17c7ff;
+      --cream: #0f0f14;
+      --customer: linear-gradient(135deg, rgba(143, 92, 255, 0.42), rgba(23, 199, 255, 0.24));
+      --assistant: rgba(255, 255, 255, 0.09);
+      --gold: #61f5ba;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+      --glow: 0 0 42px rgba(23, 199, 255, 0.18), 0 0 70px rgba(143, 92, 255, 0.16);
+      font-family: Inter, "SF Pro Display", "Segoe UI", sans-serif;
     }
 
     * {
@@ -29,9 +30,9 @@
       min-height: 100vh;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(215, 166, 66, 0.26), transparent 34rem),
-        radial-gradient(circle at bottom right, rgba(31, 107, 78, 0.22), transparent 34rem),
-        repeating-linear-gradient(90deg, rgba(28, 36, 31, 0.03) 0 1px, transparent 1px 76px),
+        radial-gradient(circle at top left, rgba(143, 92, 255, 0.32), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(23, 199, 255, 0.2), transparent 34rem),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 76px),
         var(--cream);
     }
 
@@ -46,7 +47,7 @@
       grid-template-rows: auto auto 1fr auto;
       gap: 14px;
       min-height: 100vh;
-      max-width: 860px;
+      max-width: 980px;
       margin: 0 auto;
       padding: 18px;
     }
@@ -56,37 +57,40 @@
     .composer,
     .empty {
       border: 1px solid var(--line);
+      backdrop-filter: blur(24px);
       background: var(--panel);
-      border-radius: 24px;
+      border-radius: 28px;
       box-shadow: var(--shadow);
     }
 
     .hero {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.055));
       display: flex;
       justify-content: space-between;
       gap: 18px;
-      padding: 20px;
+      padding: 22px;
     }
 
     h1 {
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(2.1rem, 7vw, 4.7rem);
-      line-height: 0.9;
+      font-size: clamp(2.1rem, 7vw, 4.4rem);
+      letter-spacing: -0.07em;
+      line-height: 0.88;
       margin: 0;
     }
 
     .hero p {
-      color: var(--muted);
+      color: #c9cdeb;
       margin: 10px 0 0;
       max-width: 560px;
     }
 
     .trust-strip {
       align-items: center;
-      background: rgba(255, 250, 235, 0.94);
-      border: 1px solid rgba(185, 130, 30, 0.24);
+      backdrop-filter: blur(18px);
+      background: rgba(97, 245, 186, 0.09);
+      border: 1px solid rgba(97, 245, 186, 0.2);
       border-radius: 18px;
-      color: #5a4215;
+      color: #c7ffe5;
       display: flex;
       font-size: 0.95rem;
       gap: 10px;
@@ -95,14 +99,14 @@
     }
 
     .trust-strip strong {
-      color: #3d2a08;
+      color: white;
     }
 
     .trust-mark {
       align-items: center;
-      background: rgba(185, 130, 30, 0.14);
+      background: rgba(97, 245, 186, 0.16);
       border-radius: 999px;
-      color: #744f0d;
+      color: #baffdf;
       display: inline-flex;
       font-weight: 900;
       height: 28px;
@@ -112,9 +116,10 @@
 
     .pill {
       align-self: start;
-      background: #e8efe7;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid var(--line);
       border-radius: 999px;
-      color: var(--brand-dark);
+      color: white;
       font-size: 0.82rem;
       font-weight: 800;
       padding: 8px 12px;
@@ -124,7 +129,7 @@
     .details-card {
       display: grid;
       gap: 12px;
-      padding: 16px;
+      padding: 18px;
     }
 
     .details-head {
@@ -140,7 +145,7 @@
     }
 
     .details-head p {
-      color: var(--muted);
+      color: #c9cdeb;
       margin: 4px 0 0;
     }
 
@@ -171,10 +176,10 @@
     }
 
     .business-contact {
-      background: #eef5ee;
+      background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--line);
       border-radius: 16px;
-      color: var(--brand-dark);
+      color: white;
       padding: 12px 14px;
     }
 
@@ -211,13 +216,15 @@
     .message.customer {
       justify-self: end;
       background: var(--customer);
-      border: 1px solid rgba(31, 107, 78, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: var(--glow);
     }
 
     .message.assistant {
       justify-self: start;
       background: var(--assistant);
       color: white;
+      border: 1px solid var(--line);
     }
 
     .empty {
@@ -238,9 +245,16 @@
     textarea {
       border: 1px solid var(--line);
       border-radius: 16px;
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
       outline: none;
       padding: 14px 15px;
       width: 100%;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: rgba(247, 248, 255, 0.44);
     }
 
     textarea {
@@ -261,15 +275,22 @@
     }
 
     .quick-actions button {
-      background: #e8efe7;
-      color: var(--brand-dark);
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--line);
+      color: white;
       font-size: 0.9rem;
       padding: 9px 12px;
     }
 
+    .quick-actions button:hover,
+    button:hover {
+      box-shadow: var(--glow);
+      transform: translateY(-2px);
+    }
+
     .proof-card {
-      background: rgba(255, 250, 235, 0.7);
-      border: 1px dashed rgba(185, 130, 30, 0.36);
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px dashed rgba(97, 245, 186, 0.28);
     }
 
     .proof-actions {
@@ -287,11 +308,12 @@
     button {
       border: 0;
       border-radius: 16px;
-      background: var(--brand);
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
       color: white;
       cursor: pointer;
       font-weight: 800;
       padding: 0 20px;
+      transition: 180ms ease;
     }
 
     button:disabled {
@@ -418,7 +440,7 @@
     </section>
 
     <form class="composer" id="chatForm">
-      <input id="messageInput" autocomplete="off" placeholder="Type your message..." required>
+      <input id="messageInput" autocomplete="off" placeholder="What would you like to order?" required>
       <button id="sendButton" type="submit">Send</button>
     </form>
   </main>
