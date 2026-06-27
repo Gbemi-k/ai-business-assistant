@@ -138,7 +138,7 @@
 
     .shell {
       display: grid;
-      grid-template-columns: 330px 1fr;
+      grid-template-columns: 310px minmax(0, 1fr);
       gap: 18px;
       max-width: 1380px;
       margin: 0 auto;
@@ -167,6 +167,15 @@
       display: grid;
       gap: 18px;
       align-content: start;
+    }
+
+    .workspace-section {
+      display: grid;
+      gap: 18px;
+    }
+
+    .workspace-section.hidden {
+      display: none !important;
     }
 
     .sidebar {
@@ -210,6 +219,12 @@
       padding: 12px 14px;
       text-decoration: none;
       transition: 180ms ease;
+    }
+
+    .sidebar-nav a.active {
+      background: linear-gradient(135deg, rgba(143, 92, 255, 0.3), rgba(23, 199, 255, 0.18));
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: var(--glow);
     }
 
     .sidebar-nav a:hover {
@@ -263,6 +278,27 @@
       gap: 10px;
       justify-content: space-between;
       margin-bottom: 10px;
+    }
+
+    .section-hero {
+      align-items: end;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }
+
+    .section-hero h2 {
+      font-size: clamp(1.7rem, 3vw, 2.8rem);
+      letter-spacing: -0.06em;
+      line-height: 0.95;
+      margin: 0;
+    }
+
+    .section-hero p {
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 8px 0 0;
+      max-width: 680px;
     }
 
     .session-bar p {
@@ -530,105 +566,46 @@
         <h1>Admin Console</h1>
         <p>Control the business profile, products, orders, and customer chat from one focused workspace.</p>
         <nav class="sidebar-nav" aria-label="Dashboard sections">
-          <a href="#profile">Profile <span>01</span></a>
-          <a href="#customer-link">Customer Link <span>02</span></a>
-          <a href="#setup">Setup <span>03</span></a>
-          <a href="#catalog">Catalog <span>04</span></a>
-          <a href="#orders">Orders <span>05</span></a>
+          <a href="#overview" data-section-link="overview">Overview <span>01</span></a>
+          <a href="#catalog" data-section-link="catalog">Catalog <span>02</span></a>
+          <a href="#orders" data-section-link="orders">Orders <span>03</span></a>
+          <a href="#profile" data-section-link="profile">Profile <span>04</span></a>
+          <a href="#settings" data-section-link="settings">Settings <span>05</span></a>
         </nav>
-      </section>
-
-      <section class="panel" id="profile">
-        <h2>Business Profile</h2>
-        <form id="businessForm" class="grid">
-          <label>Business ID
-            <input id="businessId" required readonly placeholder="biz1">
-          </label>
-          <label>Business name
-            <input id="businessName" required placeholder="StyleHub">
-          </label>
-          <label>Owner email
-            <input id="email" required type="email" placeholder="owner@example.com">
-          </label>
-          <label>Order notification email
-            <input id="notificationEmail" type="email" placeholder="orders@example.com">
-          </label>
-          <label>Password
-            <input id="password" type="password" placeholder="At least 6 characters">
-          </label>
-          <div class="grid two">
-            <label>Currency
-              <select id="currency">
-                <option value="$">$ Dollar</option>
-                <option value="&#8358;">&#8358; Naira</option>
-                <option value="&pound;">&pound; Pound</option>
-                <option value="&euro;">&euro; Euro</option>
-              </select>
-            </label>
-            <label>Tone
-              <select id="tone">
-                <option value="friendly">Friendly</option>
-                <option value="casual">Casual</option>
-                <option value="formal">Formal</option>
-              </select>
-            </label>
-          </div>
-          <label>Contact info
-            <input id="contactInfo" placeholder="Phone, WhatsApp, email">
-          </label>
-          <label>Business description
-            <textarea id="businessDescription" placeholder="What does this business sell? How do customers usually ask for it?"></textarea>
-          </label>
-          <label>AI personality
-            <textarea id="aiPersonality" placeholder="Helpful, concise, warm..."></textarea>
-          </label>
-          <div class="grid two">
-            <label>Require deposit?
-              <select id="depositEnabled">
-                <option value="false">No</option>
-                <option value="true">Yes</option>
-              </select>
-            </label>
-            <label>Deposit percentage
-              <input id="depositPercentage" min="0" max="100" step="1" type="number" placeholder="40">
-            </label>
-          </div>
-          <label>Deposit applies to
-            <select id="depositAppliesTo">
-              <option value="services">Services only</option>
-              <option value="products">Products only</option>
-              <option value="both">Products and services</option>
-            </select>
-          </label>
-          <label>Payment instruction
-            <textarea id="paymentInstructions" placeholder="Example: Pay 40% to Opay 080... and send receipt on WhatsApp."></textarea>
-          </label>
-          <div class="actions">
-            <button type="submit">Save profile</button>
-            <button type="button" class="secondary" id="logout">Logout</button>
-          </div>
-        </form>
-        <p id="businessStatus" class="status">Logged-in business profile appears here.</p>
       </section>
     </aside>
 
     <section class="workspace">
-      <section class="panel session-bar" id="customer-link">
-        <p id="sessionInfo">No business loaded.</p>
-        <div class="actions">
-          <a class="button-link" id="publicChatLink" href="#" target="_blank" rel="noopener">Open customer link</a>
-          <button type="button" class="secondary" id="copyPublicChatLink">Copy customer link</button>
-          <button type="button" class="secondary" id="refreshDashboard">Refresh dashboard</button>
-        </div>
+      <section class="workspace-section" id="section-overview" data-section="overview">
+        <section class="panel section-hero">
+          <div>
+            <h2>Overview</h2>
+            <p id="sessionInfo">No business loaded.</p>
+          </div>
+          <div class="actions">
+            <a class="button-link" id="publicChatLink" href="#" target="_blank" rel="noopener">Open customer link</a>
+            <button type="button" class="secondary" id="copyPublicChatLink">Copy customer link</button>
+            <button type="button" class="secondary" id="refreshDashboard">Refresh dashboard</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>First-time setup</h2>
+          <ul class="setup-list" id="setupChecklist"></ul>
+        </section>
       </section>
 
-      <section class="panel" id="setup">
-        <h2>First-time setup</h2>
-        <ul class="setup-list" id="setupChecklist"></ul>
-      </section>
+      <section class="workspace-section hidden" id="section-catalog" data-section="catalog">
+        <section class="panel section-hero">
+          <div>
+            <h2>Catalog</h2>
+            <p>Add products, services, stock, prices, packages, and aliases customers may type.</p>
+          </div>
+          <span class="pill" id="productCount">0 active</span>
+        </section>
 
-      <section class="panel" id="catalog">
-        <h2>Products & Services <span class="pill" id="productCount">0 active</span></h2>
+        <section class="panel">
+        <h2>Products & Services</h2>
         <form id="productForm" class="toolbar">
           <label>Type
             <select id="productType">
@@ -675,7 +652,9 @@
           </table>
         </div>
       </section>
+      </section>
 
+      <section class="workspace-section hidden" id="section-orders" data-section="orders">
       <section class="panel" id="orders">
         <h2>Orders <button type="button" class="secondary" id="refreshOrders">Refresh</button></h2>
         <div class="notify-row">
@@ -695,6 +674,108 @@
           </select>
         </label>
         <div id="ordersList" class="orders-list"></div>
+      </section>
+      </section>
+
+      <section class="workspace-section hidden" id="section-profile" data-section="profile">
+        <section class="panel section-hero">
+          <div>
+            <h2>Profile</h2>
+            <p>Control the public business identity and how the AI presents the business.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Business Profile</h2>
+          <form id="businessForm" class="grid">
+            <label>Business ID
+              <input id="businessId" required readonly placeholder="biz1">
+            </label>
+            <label>Business name
+              <input id="businessName" required placeholder="StyleHub">
+            </label>
+            <label>Owner email
+              <input id="email" required type="email" placeholder="owner@example.com">
+            </label>
+            <label>Order notification email
+              <input id="notificationEmail" type="email" placeholder="orders@example.com">
+            </label>
+            <label>Password
+              <input id="password" type="password" placeholder="At least 6 characters">
+            </label>
+            <div class="grid two">
+              <label>Currency
+                <select id="currency">
+                  <option value="$">$ Dollar</option>
+                  <option value="&#8358;">&#8358; Naira</option>
+                  <option value="&pound;">&pound; Pound</option>
+                  <option value="&euro;">&euro; Euro</option>
+                </select>
+              </label>
+              <label>Tone
+                <select id="tone">
+                  <option value="friendly">Friendly</option>
+                  <option value="casual">Casual</option>
+                  <option value="formal">Formal</option>
+                </select>
+              </label>
+            </div>
+            <label>Contact info
+              <input id="contactInfo" placeholder="Phone, WhatsApp, email">
+            </label>
+            <label>Business description
+              <textarea id="businessDescription" placeholder="What does this business sell? How do customers usually ask for it?"></textarea>
+            </label>
+            <label>AI personality
+              <textarea id="aiPersonality" placeholder="Helpful, concise, warm..."></textarea>
+            </label>
+            <div class="actions">
+              <button type="submit">Save profile</button>
+              <button type="button" class="secondary" id="logout">Logout</button>
+            </div>
+          </form>
+          <p id="businessStatus" class="status">Logged-in business profile appears here.</p>
+        </section>
+      </section>
+
+      <section class="workspace-section hidden" id="section-settings" data-section="settings">
+        <section class="panel section-hero">
+          <div>
+            <h2>Settings</h2>
+            <p>Configure deposits, payment instructions, and checkout behavior.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Deposit Settings</h2>
+          <form class="grid" id="settingsForm">
+            <div class="grid two">
+              <label>Require deposit?
+                <select id="depositEnabled">
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </label>
+              <label>Deposit percentage
+                <input id="depositPercentage" min="0" max="100" step="1" type="number" placeholder="40">
+              </label>
+            </div>
+            <label>Deposit applies to
+              <select id="depositAppliesTo">
+                <option value="services">Services only</option>
+                <option value="products">Products only</option>
+                <option value="both">Products and services</option>
+              </select>
+            </label>
+            <label>Payment instruction
+              <textarea id="paymentInstructions" placeholder="Example: Pay 40% to Opay 080... and upload receipt on the customer page."></textarea>
+            </label>
+            <div class="actions">
+              <button type="button" id="saveSettings">Save settings</button>
+            </div>
+          </form>
+          <p id="settingsStatus" class="status">Deposit and payment settings appear here.</p>
+        </section>
       </section>
 
     </section>
@@ -719,6 +800,8 @@
     const els = {
       authScreen: document.querySelector("#authScreen"),
       dashboard: document.querySelector("#dashboard"),
+      workspaceSections: document.querySelectorAll("[data-section]"),
+      sectionLinks: document.querySelectorAll("[data-section-link]"),
       authForm: document.querySelector("#authForm"),
       authBusinessId: document.querySelector("#authBusinessId"),
       authBusinessName: document.querySelector("#authBusinessName"),
@@ -741,6 +824,8 @@
       depositPercentage: document.querySelector("#depositPercentage"),
       depositAppliesTo: document.querySelector("#depositAppliesTo"),
       paymentInstructions: document.querySelector("#paymentInstructions"),
+      saveSettings: document.querySelector("#saveSettings"),
+      settingsStatus: document.querySelector("#settingsStatus"),
       logout: document.querySelector("#logout"),
       businessStatus: document.querySelector("#businessStatus"),
       sessionInfo: document.querySelector("#sessionInfo"),
@@ -812,6 +897,28 @@
     function setStatus(element, message, type = "") {
       element.textContent = message;
       element.className = `status ${type}`;
+    }
+
+    function showSection(sectionName = "overview", { updateHash = true } = {}) {
+      const sectionAliases = {
+        "customer-link": "overview",
+        setup: "overview",
+      };
+      const validSections = [...els.workspaceSections].map(section => section.dataset.section);
+      const requestedSection = sectionAliases[sectionName] || sectionName;
+      const nextSection = validSections.includes(requestedSection) ? requestedSection : "overview";
+
+      els.workspaceSections.forEach(section => {
+        section.classList.toggle("hidden", section.dataset.section !== nextSection);
+      });
+
+      els.sectionLinks.forEach(link => {
+        link.classList.toggle("active", link.dataset.sectionLink === nextSection);
+      });
+
+      if (updateHash) {
+        history.replaceState(null, "", `#${nextSection}`);
+      }
     }
 
     function isActiveOrder(order) {
@@ -998,6 +1105,7 @@
     function showDashboard() {
       els.authScreen.classList.add("hidden");
       els.dashboard.classList.remove("hidden");
+      showSection((location.hash || "#overview").slice(1), { updateHash: false });
     }
 
     async function api(path, options = {}) {
@@ -1238,43 +1346,54 @@
       renderSetupChecklist();
     }
 
+    function businessPayload() {
+      const payload = {
+        businessId: activeBusinessId(),
+        name: els.businessName.value.trim(),
+        email: els.email.value.trim(),
+        notification_email: els.notificationEmail.value.trim(),
+        currency: els.currency.value,
+        tone: els.tone.value,
+        description: els.businessDescription.value.trim(),
+        contact_info: els.contactInfo.value.trim(),
+        deposit_enabled: els.depositEnabled.value === "true",
+        deposit_percentage: Number(els.depositPercentage.value || 0),
+        deposit_applies_to: els.depositAppliesTo.value,
+        payment_instructions: els.paymentInstructions.value.trim(),
+        ai_personality: els.aiPersonality.value.trim(),
+      };
+
+      if (els.password.value) {
+        payload.password = els.password.value;
+      }
+
+      return payload;
+    }
+
+    async function saveBusinessProfile(successMessage = "Saved business profile.") {
+      const result = await api("/businesses", {
+        method: "POST",
+        body: JSON.stringify(businessPayload()),
+      });
+
+      if (result.token) {
+        state.token = result.token;
+        localStorage.setItem("adminToken", state.token);
+      }
+
+      const { business } = result;
+      fillBusinessForm(business);
+      els.password.value = "";
+      setStatus(els.businessStatus, successMessage.replace("{name}", business.name), "good");
+      await Promise.all([loadProducts(), loadOrders({ silent: true })]);
+      startOrderPolling();
+      return business;
+    }
+
     els.businessForm.addEventListener("submit", async event => {
       event.preventDefault();
       try {
-        const payload = {
-          businessId: activeBusinessId(),
-          name: els.businessName.value.trim(),
-          email: els.email.value.trim(),
-          notification_email: els.notificationEmail.value.trim(),
-          currency: els.currency.value,
-          tone: els.tone.value,
-          description: els.businessDescription.value.trim(),
-          contact_info: els.contactInfo.value.trim(),
-          deposit_enabled: els.depositEnabled.value === "true",
-          deposit_percentage: Number(els.depositPercentage.value || 0),
-          deposit_applies_to: els.depositAppliesTo.value,
-          payment_instructions: els.paymentInstructions.value.trim(),
-          ai_personality: els.aiPersonality.value.trim(),
-        };
-
-        if (els.password.value) {
-          payload.password = els.password.value;
-        }
-
-        const result = await api("/businesses", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        if (result.token) {
-          state.token = result.token;
-          localStorage.setItem("adminToken", state.token);
-        }
-        const { business } = result;
-        fillBusinessForm(business);
-        els.password.value = "";
-        setStatus(els.businessStatus, `Saved ${business.name}.`, "good");
-        await Promise.all([loadProducts(), loadOrders({ silent: true })]);
-        startOrderPolling();
+        await saveBusinessProfile("Saved {name}.");
       } catch (error) {
         setStatus(els.businessStatus, error.message, "bad");
       }
@@ -1317,6 +1436,24 @@
     els.logout.addEventListener("click", () => logout());
     els.refreshDashboard.addEventListener("click", loadBusiness);
     els.productType.addEventListener("change", syncOfferingForm);
+    els.sectionLinks.forEach(link => {
+      link.addEventListener("click", event => {
+        event.preventDefault();
+        showSection(link.dataset.sectionLink);
+      });
+    });
+    window.addEventListener("hashchange", () => {
+      showSection((location.hash || "#overview").slice(1), { updateHash: false });
+    });
+    els.saveSettings.addEventListener("click", async () => {
+      try {
+        await saveBusinessProfile("Saved checkout settings for {name}.");
+        setStatus(els.settingsStatus, "Checkout settings saved.", "good");
+        showSection("settings");
+      } catch (error) {
+        setStatus(els.settingsStatus, error.message, "bad");
+      }
+    });
     els.copyPublicChatLink.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(publicChatUrl());
