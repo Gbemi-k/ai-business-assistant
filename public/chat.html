@@ -47,15 +47,17 @@
       grid-template-rows: auto auto 1fr auto;
       gap: 14px;
       min-height: 100vh;
-      max-width: 980px;
+      max-width: 1080px;
       margin: 0 auto;
       padding: 18px;
     }
 
     .hero,
     .details-card,
+    .quick-action-card,
     .composer,
-    .empty {
+    .empty,
+    .messages {
       border: 1px solid var(--line);
       backdrop-filter: blur(24px);
       background: var(--panel);
@@ -201,8 +203,11 @@
       align-content: end;
       display: grid;
       gap: 12px;
+      min-height: 360px;
+      max-height: 54vh;
       overflow-y: auto;
-      padding: 4px;
+      padding: 16px;
+      scroll-behavior: smooth;
     }
 
     .message {
@@ -239,6 +244,9 @@
       grid-template-columns: 1fr auto;
       gap: 10px;
       padding: 12px;
+      position: sticky;
+      bottom: 12px;
+      z-index: 10;
     }
 
     input,
@@ -272,6 +280,17 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+    }
+
+    .quick-action-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .quick-action-card p {
+      color: var(--muted);
+      margin: 0;
     }
 
     .quick-actions button {
@@ -312,8 +331,14 @@
       color: white;
       cursor: pointer;
       font-weight: 800;
+      min-height: 48px;
       padding: 0 20px;
       transition: 180ms ease;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--line);
     }
 
     button:disabled {
@@ -327,12 +352,23 @@
 
     @media (max-width: 640px) {
       .shell {
+        gap: 10px;
         padding: 10px;
       }
 
       .hero {
         border-radius: 20px;
         display: grid;
+        order: 1;
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: clamp(2.35rem, 13vw, 3.4rem);
+      }
+
+      .hero p {
+        font-size: 0.95rem;
       }
 
       .details-grid {
@@ -349,8 +385,49 @@
         display: grid;
       }
 
+      .trust-strip {
+        order: 2;
+      }
+
+      .quick-action-card {
+        order: 3;
+      }
+
+      .messages {
+        border-radius: 22px;
+        max-height: none;
+        min-height: 45vh;
+        order: 4;
+        padding: 12px;
+      }
+
+      .composer {
+        border-radius: 22px;
+        bottom: 8px;
+        grid-template-columns: 1fr;
+        order: 5;
+      }
+
+      .composer button {
+        min-height: 52px;
+      }
+
+      .details-card {
+        border-radius: 20px;
+        order: 6;
+        padding: 14px;
+      }
+
+      .proof-card {
+        order: 7;
+      }
+
+      .business-card {
+        order: 8;
+      }
+
       .message {
-        max-width: 92%;
+        max-width: 96%;
       }
     }
   </style>
@@ -367,6 +444,15 @@
 
     <section class="trust-strip" id="trustStrip">
       <span><span class="trust-mark">✓</span> <strong>Official ordering page</strong> for <span id="trustBusinessName">this business</span>. Your order goes directly to the business owner.</span>
+    </section>
+
+    <section class="quick-action-card" aria-label="Quick chat actions">
+      <p>Start with one tap, or type naturally in the chat.</p>
+      <div class="quick-actions">
+        <button type="button" data-message="what do you have available?">See what is available</button>
+        <button type="button" data-message="how much is it?">Ask the price</button>
+        <button type="button" data-message="show my last order">Check last order</button>
+      </div>
     </section>
 
     <section class="details-card business-card">
@@ -408,11 +494,6 @@
       <label id="noteLabel"><span id="noteLabelText">Extra note</span>
         <input id="customerNote" placeholder="Optional, e.g. service details or special request">
       </label>
-      <div class="quick-actions">
-        <button type="button" data-message="what do you have available?">What is available?</button>
-        <button type="button" data-message="how much is it?">Ask price</button>
-        <button type="button" data-message="show my last order">Last order</button>
-      </div>
     </section>
 
     <section class="details-card proof-card">

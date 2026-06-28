@@ -301,6 +301,55 @@
       max-width: 680px;
     }
 
+    .metric-grid,
+    .quick-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .metric-card,
+    .quick-card {
+      background: rgba(255, 255, 255, 0.075);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 14px;
+    }
+
+    .metric-card span,
+    .quick-card span {
+      color: var(--muted);
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .metric-card strong {
+      display: block;
+      font-size: clamp(1.7rem, 4vw, 2.35rem);
+      letter-spacing: -0.06em;
+      line-height: 1;
+      margin-top: 10px;
+    }
+
+    .quick-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .quick-card p {
+      color: var(--muted);
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .quick-card a,
+    .quick-card button {
+      justify-self: start;
+    }
+
     .session-bar p {
       color: var(--muted);
       margin: 0;
@@ -513,19 +562,131 @@
       padding: 8px 0;
     }
 
+    @media (max-width: 1100px) {
+      .metric-grid,
+      .quick-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 980px) {
       .shell,
       .toolbar,
-      .grid.two {
+      .grid.two,
+      .section-hero {
         grid-template-columns: 1fr;
       }
 
       .sidebar {
-        position: static;
+        background: linear-gradient(180deg, rgba(15, 15, 20, 0.98), rgba(15, 15, 20, 0.84));
+        margin: -16px -16px 0;
+        padding: 16px 16px 10px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
       }
 
       .shell {
         padding: 16px;
+      }
+
+      .masthead {
+        padding-bottom: 4px;
+      }
+
+      .masthead h1 {
+        font-size: 2.4rem;
+        letter-spacing: -0.06em;
+      }
+
+      .masthead p {
+        font-size: 0.92rem;
+        margin-top: 8px;
+      }
+
+      .sidebar-nav {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        scrollbar-width: none;
+      }
+
+      .sidebar-nav::-webkit-scrollbar {
+        display: none;
+      }
+
+      .sidebar-nav a {
+        flex: 0 0 auto;
+        gap: 16px;
+        min-width: 138px;
+      }
+
+      .section-hero {
+        align-items: stretch;
+        display: grid;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        background:
+          radial-gradient(circle at 20% 0%, rgba(143, 92, 255, 0.3), transparent 24rem),
+          radial-gradient(circle at 90% 10%, rgba(23, 199, 255, 0.16), transparent 24rem),
+          #0f0f14;
+      }
+
+      .shell {
+        gap: 14px;
+        padding: 12px;
+      }
+
+      .sidebar {
+        margin: -12px -12px 0;
+        padding: 12px 12px 8px;
+      }
+
+      .masthead h1 {
+        font-size: 2rem;
+      }
+
+      .masthead p {
+        display: none;
+      }
+
+      .panel {
+        border-radius: 20px;
+        padding: 14px;
+      }
+
+      .metric-grid,
+      .quick-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions,
+      .notify-row {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .actions button,
+      .actions .button-link,
+      .notify-row button,
+      .section-hero button,
+      .section-hero .button-link {
+        text-align: center;
+        width: 100%;
+      }
+
+      table {
+        min-width: 780px;
+      }
+
+      .order-head {
+        align-items: stretch;
+        display: grid;
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -587,6 +748,48 @@
             <button type="button" class="secondary" id="copyPublicChatLink">Copy customer link</button>
             <button type="button" class="secondary" id="refreshDashboard">Refresh dashboard</button>
           </div>
+        </section>
+
+        <section class="metric-grid" aria-label="Business summary">
+          <article class="metric-card">
+            <span>Active orders</span>
+            <strong id="activeOrderCount">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Catalog items</span>
+            <strong id="catalogMetricCount">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Pending deposits</span>
+            <strong id="pendingDepositCount">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Delivered</span>
+            <strong id="deliveredOrderCount">0</strong>
+          </article>
+        </section>
+
+        <section class="quick-grid" aria-label="Quick actions">
+          <article class="quick-card">
+            <span>Share your link</span>
+            <p>Open or copy the customer page and send it on WhatsApp, Instagram, or SMS.</p>
+            <button type="button" class="secondary" id="copyPublicChatLinkCard">Copy customer link</button>
+          </article>
+          <article class="quick-card">
+            <span>Add what you sell</span>
+            <p>Add products, services, packages, prices, stock, duration, and simple aliases.</p>
+            <a class="button-link" href="#catalog" data-section-link="catalog">Go to catalog</a>
+          </article>
+          <article class="quick-card">
+            <span>Watch new orders</span>
+            <p>Keep the dashboard open to hear new order sounds and see the order bell.</p>
+            <a class="button-link" href="#orders" data-section-link="orders">View orders</a>
+          </article>
+          <article class="quick-card">
+            <span>Customize AI</span>
+            <p>Set your description, tone, contact details, and business personality.</p>
+            <a class="button-link" href="#profile" data-section-link="profile">Edit profile</a>
+          </article>
         </section>
 
         <section class="panel">
@@ -831,7 +1034,12 @@
       sessionInfo: document.querySelector("#sessionInfo"),
       publicChatLink: document.querySelector("#publicChatLink"),
       copyPublicChatLink: document.querySelector("#copyPublicChatLink"),
+      copyPublicChatLinkCard: document.querySelector("#copyPublicChatLinkCard"),
       refreshDashboard: document.querySelector("#refreshDashboard"),
+      activeOrderCount: document.querySelector("#activeOrderCount"),
+      catalogMetricCount: document.querySelector("#catalogMetricCount"),
+      pendingDepositCount: document.querySelector("#pendingDepositCount"),
+      deliveredOrderCount: document.querySelector("#deliveredOrderCount"),
       setupChecklist: document.querySelector("#setupChecklist"),
       productForm: document.querySelector("#productForm"),
       productType: document.querySelector("#productType"),
@@ -1162,6 +1370,19 @@
       return new URL(`/b/${encodeURIComponent(activeBusinessId())}`, window.location.origin).href;
     }
 
+    function renderOverviewStats() {
+      const activeOrders = state.orders.filter(order => order.status !== "delivered").length;
+      const pendingDeposits = state.orders.filter(order =>
+        order.deposit_enabled && (order.payment_status || "pending_deposit") === "pending_deposit"
+      ).length;
+      const deliveredOrders = state.orders.filter(order => order.status === "delivered").length;
+
+      els.activeOrderCount.textContent = activeOrders;
+      els.catalogMetricCount.textContent = state.products.length;
+      els.pendingDepositCount.textContent = pendingDeposits;
+      els.deliveredOrderCount.textContent = deliveredOrders;
+    }
+
     function renderSetupChecklist() {
       const hasProfile = Boolean(state.business?.name && state.business?.contact_info);
       const hasOfferings = state.products.length > 0;
@@ -1185,6 +1406,7 @@
 
     function renderProducts() {
       els.productCount.textContent = `${state.products.length} active`;
+      renderOverviewStats();
       els.productsTable.innerHTML = state.products.map(product => `
         <tr>
           <td><span class="pill">${product.type || "product"}</span></td>
@@ -1207,6 +1429,7 @@
     }
 
     function renderOrders() {
+      renderOverviewStats();
       const visibleOrders = state.orders.filter(order => {
         if (state.orderFilter === "active") {
           return order.status !== "delivered";
@@ -1454,14 +1677,18 @@
         setStatus(els.settingsStatus, error.message, "bad");
       }
     });
-    els.copyPublicChatLink.addEventListener("click", async () => {
+
+    async function copyCustomerLink() {
       try {
         await navigator.clipboard.writeText(publicChatUrl());
         setStatus(els.businessStatus, "Customer link copied. You can paste it on WhatsApp, Instagram, or send it to a customer.", "good");
       } catch (error) {
         setStatus(els.businessStatus, `Copy failed. Your customer link is: ${publicChatUrl()}`, "bad");
       }
-    });
+    }
+
+    els.copyPublicChatLink.addEventListener("click", copyCustomerLink);
+    els.copyPublicChatLinkCard.addEventListener("click", copyCustomerLink);
 
     els.productForm.addEventListener("submit", async event => {
       event.preventDefault();
