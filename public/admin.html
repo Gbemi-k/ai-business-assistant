@@ -9,8 +9,10 @@
       --ink: #f7f8ff;
       --muted: #a7abc7;
       --line: rgba(255, 255, 255, 0.12);
-      --panel: rgba(255, 255, 255, 0.075);
-      --surface: rgba(255, 255, 255, 0.1);
+      --panel: rgba(255, 255, 255, 0.085);
+      --surface: rgba(255, 255, 255, 0.11);
+      --field-bg: rgba(255, 255, 255, 0.095);
+      --dropdown-bg: #171c2a;
       --brand: #8f5cff;
       --brand-dark: #17c7ff;
       --accent: #61f5ba;
@@ -33,11 +35,23 @@
       margin: 0;
       color: var(--ink);
       background:
-        radial-gradient(circle at 12% 8%, rgba(143, 92, 255, 0.32), transparent 34rem),
-        radial-gradient(circle at 90% 12%, rgba(23, 199, 255, 0.2), transparent 36rem),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 80px),
-        #0f0f14;
+        radial-gradient(circle at 10% 0%, rgba(143, 92, 255, 0.28), transparent 34rem),
+        radial-gradient(circle at 92% 8%, rgba(23, 199, 255, 0.22), transparent 36rem),
+        radial-gradient(circle at 68% 85%, rgba(97, 245, 186, 0.08), transparent 34rem),
+        linear-gradient(135deg, #161827 0%, #101724 46%, #071821 100%);
       min-height: 100vh;
+    }
+
+    body::before {
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+      background-size: 80px 80px;
+      content: "";
+      inset: 0;
+      mask-image: linear-gradient(to bottom, black, transparent 80%);
+      pointer-events: none;
+      position: fixed;
     }
 
     button,
@@ -120,7 +134,22 @@
       outline: none;
       padding: 10px 11px;
       width: 100%;
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--field-bg);
+      color: white;
+    }
+
+    select {
+      color-scheme: dark;
+    }
+
+    select option,
+    select optgroup {
+      background: var(--dropdown-bg);
+      color: var(--ink);
+    }
+
+    select option:checked {
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
       color: white;
     }
 
@@ -143,6 +172,8 @@
       max-width: 1380px;
       margin: 0 auto;
       padding: 24px;
+      position: relative;
+      z-index: 1;
     }
 
     .auth-shell {
@@ -150,6 +181,8 @@
       display: grid;
       min-height: 100vh;
       padding: 24px;
+      position: relative;
+      z-index: 1;
     }
 
     .auth-card {
@@ -631,9 +664,9 @@
     @media (max-width: 640px) {
       body {
         background:
-          radial-gradient(circle at 20% 0%, rgba(143, 92, 255, 0.3), transparent 24rem),
-          radial-gradient(circle at 90% 10%, rgba(23, 199, 255, 0.16), transparent 24rem),
-          #0f0f14;
+          radial-gradient(circle at 20% 0%, rgba(143, 92, 255, 0.24), transparent 24rem),
+          radial-gradient(circle at 90% 10%, rgba(23, 199, 255, 0.18), transparent 24rem),
+          linear-gradient(135deg, #151827 0%, #101724 50%, #071821 100%);
       }
 
       .shell {
