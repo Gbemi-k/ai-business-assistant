@@ -200,14 +200,16 @@
     }
 
     .messages {
-      align-content: end;
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 12px;
       min-height: 360px;
       max-height: 54vh;
       overflow-y: auto;
+      overscroll-behavior: contain;
       padding: 16px;
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
 
     .message {
@@ -219,6 +221,7 @@
     }
 
     .message.customer {
+      align-self: flex-end;
       justify-self: end;
       background: var(--customer);
       border: 1px solid rgba(255, 255, 255, 0.16);
@@ -226,6 +229,7 @@
     }
 
     .message.assistant {
+      align-self: flex-start;
       justify-self: start;
       background: var(--assistant);
       color: white;
@@ -235,6 +239,7 @@
     .empty {
       align-self: center;
       color: var(--muted);
+      margin: auto;
       padding: 20px;
       text-align: center;
     }
